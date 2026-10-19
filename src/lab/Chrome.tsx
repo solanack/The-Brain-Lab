@@ -147,7 +147,20 @@ export function Chrome() {
       </div>
 
       {sheet && (
-        <div className="pointer-events-auto max-h-96 overflow-y-auto border-t border-border bg-bg/95 lg:hidden">
+        <div className="pointer-events-auto fixed inset-x-0 bottom-16 z-20 max-h-[60vh] overflow-y-auto rounded-t-2xl border-t border-border bg-bg/95 shadow-2xl backdrop-blur-md lg:hidden">
+          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-bg/90 px-3 py-2">
+            <span className="font-mono text-xs uppercase tracking-widest text-muted">
+              {sheet === "layers" ? "Layers" : sheet === "dossier" ? "Notes" : "Field"}
+            </span>
+            <button
+              type="button"
+              onClick={() => patch({ sheet: null })}
+              className="flex size-8 items-center justify-center rounded-full bg-surface-2"
+              aria-label="Close panel"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
           {sheet === "layers" && <Layers />}
           {sheet === "dossier" && <Dossier />}
           {sheet === "field" && <Field />}

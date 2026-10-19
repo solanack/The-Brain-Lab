@@ -166,21 +166,40 @@ function makeMaterial(cat: CatId, specimen: THREE.Color) {
   const meta = CAT_BY_ID[cat];
   const glassy = cat === "dura" || cat === "arachnoid" || cat === "ventricles";
   const sheet = cat === "dura" || cat === "arachnoid" || cat === "meninges_dura" || cat === "ventricles";
+  const wet = cat === "cortex" || cat === "cerebellum" || cat === "brainstem" || cat === "deep_grey" || cat === "diencephalon";
+  const vessel = cat === "arteries" || cat === "veins_sinuses";
+
   const mat = new THREE.MeshStandardMaterial({
     color: specimen,
-    roughness: meta.rough,
-    metalness: cat === "arteries" ? 0.08 : 0.04,
-    envMapIntensity: cat === "arteries" ? 0.7 : 0.48,
+    roughness: wet ? Math.min(meta.rough, 0.28) : vessel ? 0.22 : meta.rough,
+    metalness: vessel ? 0.12 : wet ? 0.02 : 0.04,
+    envMapIntensity: vessel ? 1.1 : wet ? 0.85 : 0.55,
     side: sheet ? THREE.DoubleSide : THREE.FrontSide,
     transparent: glassy || meta.transparent,
     opacity: meta.opacity,
     depthWrite: !glassy && meta.opacity > 0.6,
+    clearcoat: wet || vessel ? 0.35 : 0,
+    clearcoatRoughness: wet ? 0.25 : 0.4,
+    sheen: wet ? 0.4 : 0,
+    sheenRoughness: 0.4,
+    sheenColor: specimen.clone().multiplyScalar(0.6),
   });
-  if (cat === "arteries" || cat === "veins_sinuses") {
+
+  if (vessel) {
+    mat.emissive = specimen.clone().multiplyScalar(0.08);
+    mat.emissiveIntensity = 0.25;
     mat.polygonOffset = true;
     mat.polygonOffsetFactor = -2;
     mat.polygonOffsetUnits = -2;
   }
+
+  if (cat === "ventricles") {
+    mat.transmission = 0.65;
+    mat.thickness = 0.4;
+    mat.ior = 1.33;
+    mat.roughness = 0.08;
+  }
+
   return mat;
 }
 
@@ -666,12 +685,83 @@ function visualTarget(rec: Rec, frame: Frame, explode: number, retract: number, 
       frame.tray.z + row * frame.maxDim * 0.26,
     );
   }
-  const distOut = explode * rec.weight * frame.maxDim * 0.22;
-  out.copy(rec.restCenter).addScaledVector(rec.dir, distOut);
-  if (rec.side === "left") out.addScaledVector(frame.right, -explode * frame.maxDim * 0.16);
-  if (rec.side === "right") out.addScaledVector(frame.right, explode * frame.maxDim * 0.16);
-  if (rec.key === "env:dura") out.addScaledVector(frame.superior, retract * frame.maxDim * 0.18);
-  if (rec.key === "env:arachnoid") out.addScaledVector(frame.superior, retract * frame.maxDim * 0.08);
+
+  const e = explode;
+  const md = frame.maxDim;
+  out.copy(rec.restCenter);
+
+  // Category-specific anatomical displacement for a realistic layered explode
+  switch (rec.cat) {
+    case "dura":
+    case "meninges_dura":
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.55);
+      out.addScaledVector(frame.superior, e * md * 0.42 + retract * md * 0.22);
+      if (rec.side === "left") out.addScaledVector(frame.right, -e * md * 0.28);
+      if (rec.side === "right") out.addScaledVector(frame.right, e * md * 0.28);
+      break;
+    case "arachnoid":
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.38);
+      out.addScaledVector(frame.superior, e * md * 0.26 + retract * md * 0.12);
+      if (rec.side === "left") out.addScaledVector(frame.right, -e * md * 0.18);
+      if (rec.side === "right") out.addScaledVector(frame.right, e * md * 0.18);
+      break;
+    case "cortex":
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.48);
+      out.addScaledVector(frame.superior, e * md * 0.18);
+      if (rec.side === "left") out.addScaledVector(frame.right, -e * md * 0.32);
+      if (rec.side === "right") out.addScaledVector(frame.right, e * md * 0.32);
+      // Subtle anterior/posterior peel for gyri
+      out.addScaledVector(frame.anterior, e * md * 0.06 * (rec.restCenter.dot(frame.anterior) > 0 ? 1 : -0.4));
+      break;
+    case "white_matter":
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.22);
+      if (rec.side === "left") out.addScaledVector(frame.right, -e * md * 0.14);
+      if (rec.side === "right") out.addScaledVector(frame.right, e * md * 0.14);
+      break;
+    case "tracts":
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.36);
+      out.addScaledVector(frame.superior, e * md * 0.08);
+      if (rec.side === "left") out.addScaledVector(frame.right, -e * md * 0.2);
+      if (rec.side === "right") out.addScaledVector(frame.right, e * md * 0.2);
+      break;
+    case "deep_grey":
+    case "diencephalon":
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.12);
+      out.addScaledVector(frame.superior, e * md * 0.04);
+      break;
+    case "ventricles":
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.08);
+      out.addScaledVector(frame.superior, e * md * 0.03);
+      break;
+    case "brainstem":
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.28);
+      out.addScaledVector(frame.superior, -e * md * 0.12); // inferior drift
+      out.addScaledVector(frame.anterior, -e * md * 0.08);
+      break;
+    case "cerebellum":
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.42);
+      out.addScaledVector(frame.superior, -e * md * 0.16);
+      out.addScaledVector(frame.anterior, -e * md * 0.18);
+      if (rec.side === "left") out.addScaledVector(frame.right, -e * md * 0.22);
+      if (rec.side === "right") out.addScaledVector(frame.right, e * md * 0.22);
+      break;
+    case "arteries":
+    case "veins_sinuses":
+    case "cranial_nerves":
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.5);
+      out.addScaledVector(frame.superior, e * md * 0.14);
+      if (rec.side === "left") out.addScaledVector(frame.right, -e * md * 0.24);
+      if (rec.side === "right") out.addScaledVector(frame.right, e * md * 0.24);
+      break;
+    default:
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.3);
+  }
+
+  // Fine per-structure jitter for organic detail (deterministic from key)
+  const jitter = (parseInt(rec.key.slice(-4), 16) % 100) / 100 - 0.5;
+  out.addScaledVector(rec.dir, e * md * 0.015 * jitter);
+  out.addScaledVector(frame.right, e * md * 0.01 * jitter);
+
   return out;
 }
 
