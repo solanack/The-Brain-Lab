@@ -183,7 +183,7 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
     cat === "diencephalon";
   const flesh = cat === "cortex" || cat === "cerebellum" || cat === "deep_grey" || cat === "brainstem";
   const vessel = cat === "arteries" || cat === "veins_sinuses";
-  const physical = wet || vessel || cat === "ventricles";
+  const physical = wet || vessel || cat === "ventricles" || cat === "arachnoid";
   const roughJitter = (hashUnit(seed) - 0.5) * 0.08;
   if (flesh) specimen.offsetHSL((hashUnit(seed + 3) - 0.5) * 0.02, (hashUnit(seed + 9) - 0.5) * 0.05, 0);
   const roughness = flesh
@@ -235,9 +235,21 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
       phys.envMapIntensity = 0.45;
       mat.roughness = 0.36;
     }
+    if (cat === "arachnoid") {
+      phys.iridescence = 0.26;
+      phys.iridescenceIOR = 1.34;
+      phys.iridescenceThicknessRange = [90, 360];
+      phys.roughness = 0.16;
+      phys.clearcoat = 0.42;
+      phys.clearcoatRoughness = 0.2;
+      mat.roughness = 0.16;
+    }
   }
   mat.userData.rough0 = mat.roughness;
   mat.userData.coat0 = (mat as THREE.MeshPhysicalMaterial).clearcoat ?? 0;
+  mat.userData.aniso = cat === "tracts" ? 0.32 : cat === "white_matter" ? 0.22 : cat === "brainstem" ? 0.14 : 0;
+  mat.userData.scatter = cat === "cortex" || cat === "cerebellum" ? 0.55 : cat === "brainstem" ? 0.34 : cat === "deep_grey" ? 0.16 : 0;
+  mat.userData.fiber = new THREE.Vector3(0, 1, 0);
   if (vessel) {
     mat.polygonOffset = true;
     mat.polygonOffsetFactor = -2;
@@ -1006,8 +1018,83 @@ type Controls = {
   removeEventListener: (type: string, listener: () => void) => void;
 };
 
+function principalAxis(mesh: THREE.Mesh) {
+  if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+  const size = mesh.geometry.boundingBox!.getSize(new THREE.Vector3());
+  if (size.y >= size.x && size.y >= size.z) return new THREE.Vector3(0, 1, 0);
+  if (size.z >= size.x && size.z >= size.y) return new THREE.Vector3(0, 0, 1);
+  return new THREE.Vector3(1, 0, 0);
+}
+
+const CAP_CATS = new Set<CatId>(["cortex", "cerebellum", "brainstem", "spinal_cord", "white_matter", "tracts", "deep_grey", "diencephalon"]);
+
+function addSectionCaps(records: Rec[], scene: THREE.Scene, radius: number) {
+  const backMat = new THREE.MeshBasicMaterial({
+    side: THREE.BackSide,
+    clippingPlanes: CLIP_ON,
+    depthWrite: false,
+    depthTest: false,
+    colorWrite: false,
+    stencilWrite: true,
+    stencilFunc: THREE.AlwaysStencilFunc,
+    stencilFail: THREE.IncrementWrapStencilOp,
+    stencilZFail: THREE.IncrementWrapStencilOp,
+    stencilZPass: THREE.IncrementWrapStencilOp,
+  });
+  const frontMat = new THREE.MeshBasicMaterial({
+    side: THREE.FrontSide,
+    clippingPlanes: CLIP_ON,
+    depthWrite: false,
+    depthTest: false,
+    colorWrite: false,
+    stencilWrite: true,
+    stencilFunc: THREE.AlwaysStencilFunc,
+    stencilFail: THREE.DecrementWrapStencilOp,
+    stencilZFail: THREE.DecrementWrapStencilOp,
+    stencilZPass: THREE.DecrementWrapStencilOp,
+  });
+  const skip = () => {};
+  for (const rec of records) {
+    if (!CAP_CATS.has(rec.cat)) continue;
+    const back = new THREE.Mesh(rec.mesh.geometry, backMat);
+    const front = new THREE.Mesh(rec.mesh.geometry, frontMat);
+    back.renderOrder = 1;
+    front.renderOrder = 1;
+    back.visible = false;
+    front.visible = false;
+    back.raycast = skip;
+    front.raycast = skip;
+    rec.mesh.add(back, front);
+    rec.mesh.userData.caps = [back, front];
+    rec.mesh.renderOrder = 3;
+  }
+  const capMat = new THREE.MeshStandardMaterial({
+    color: "#c8beb4",
+    roughness: 0.96,
+    metalness: 0,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+    stencilWrite: true,
+    stencilRef: 0,
+    stencilFunc: THREE.NotEqualStencilFunc,
+    stencilFail: THREE.KeepStencilOp,
+    stencilZFail: THREE.KeepStencilOp,
+    stencilZPass: THREE.KeepStencilOp,
+  });
+  applyRepeating(capMat, "white_matter", radius * 0.004, 5);
+  const cap = new THREE.Mesh(new THREE.CircleGeometry(radius * 2.4, 72), capMat);
+  cap.name = "section-cap";
+  cap.renderOrder = 2;
+  cap.visible = false;
+  cap.raycast = skip;
+  scene.add(cap);
+  return cap;
+}
+
 function Specimen() {
-  const { camera, gl } = useThree();
+  const { camera, gl, scene } = useThree();
   const liveControls = useThree((s) => s.controls) as Controls | null;
   const controlsRef = useRef<Controls | null>(null);
   controlsRef.current = liveControls;
@@ -1023,6 +1110,10 @@ function Specimen() {
   const rimRef = useRef<THREE.DirectionalLight>(null);
   const transRef = useRef<THREE.PointLight>(null);
   const rig = useRef<THREE.Group>(null);
+  const capRef = useRef<THREE.Mesh | null>(null);
+  const qualityRef = useRef(useLab.getState().quality);
+  const _z = useRef(new THREE.Vector3(0, 0, 1)).current;
+  const _q = useRef(new THREE.Quaternion()).current;
 
   useEffect(() => {
     const controls = controlsRef.current;
@@ -1086,6 +1177,8 @@ function Specimen() {
               const specimen = varyColor(CAT_BY_ID[cat].color, id);
               const parcel = parcelColor(cat, parcelIndex++);
               const mat = makeMaterial(cat, specimen, id);
+              mat.userData.fiber = principalAxis(mesh);
+              if (CAP_CATS.has(cat)) mesh.castShadow = true;
               const previous = mesh.material;
               mesh.material = mat;
               if (Array.isArray(previous)) previous.forEach((m) => m.dispose());
@@ -1281,6 +1374,7 @@ function Specimen() {
                 for (const [geo, mat, key, label, blurb] of parts) {
                   const mesh = new THREE.Mesh(geo, mat);
                   mesh.userData.key = key;
+                  if (key === "cord:spinal") mesh.castShadow = true;
                   gltf.scene.add(mesh);
                   const restCenter = meshCenter(mesh);
                   const specimen = (mat as THREE.MeshStandardMaterial).color.clone();
@@ -1387,6 +1481,14 @@ function Specimen() {
             barTag.position.set(center.x + barLen * 0.9, floorY + maxDim * 0.08, center.z + maxDim * 0.72);
             barTag.scale.set(maxDim * 0.16, maxDim * 0.08, 1);
             room.add(bar, barTag);
+            const ground = new THREE.Mesh(
+              new THREE.CircleGeometry(maxDim * 2.8, 48),
+              new THREE.ShadowMaterial({ opacity: 0.34, color: "#050708" }),
+            );
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.set(center.x, floorY, center.z);
+            ground.receiveShadow = true;
+            room.add(ground);
             const trayOrigin = new THREE.Vector3(center.x + maxDim * 1.15, floorY, center.z);
 
             const leftMark = tagSprite("L", "#9eb0aa");
@@ -1406,15 +1508,32 @@ function Specimen() {
 
             const keyPos = center
               .clone()
-              .addScaledVector(anterior, maxDim * 1.3)
-              .addScaledVector(superior, maxDim * 1.9)
-              .addScaledVector(rightAxis, -maxDim * 0.35);
+              .addScaledVector(anterior, maxDim * 0.45)
+              .addScaledVector(superior, maxDim * 2.45)
+              .addScaledVector(rightAxis, -maxDim * 0.2);
             keyRef.current?.position.copy(keyPos);
-            fillRef.current?.position
-              .copy(center)
-              .addScaledVector(superior, maxDim * 0.5)
-              .addScaledVector(rightAxis, maxDim * 1.8);
-            rimRef.current?.position.copy(center).addScaledVector(anterior, -maxDim * 1.8).addScaledVector(superior, maxDim * 0.7);
+            if (keyRef.current) {
+              keyRef.current.castShadow = true;
+              keyRef.current.shadow.mapSize.set(512, 512);
+              keyRef.current.shadow.bias = -0.0004;
+              keyRef.current.shadow.normalBias = maxDim * 0.02;
+              const shadowCam = keyRef.current.shadow.camera as THREE.OrthographicCamera;
+              const span = maxDim * 2.4;
+              shadowCam.left = -span;
+              shadowCam.right = span;
+              shadowCam.top = span;
+              shadowCam.bottom = -span;
+              shadowCam.near = maxDim * 0.05;
+              shadowCam.far = maxDim * 10;
+              shadowCam.updateProjectionMatrix();
+              scene.add(keyRef.current.target);
+              keyRef.current.target.position.copy(center);
+              keyRef.current.color.set("#d7e6f6");
+            }
+            fillRef.current?.position.copy(center).addScaledVector(rightAxis, maxDim * 1.7).addScaledVector(superior, maxDim * 0.25);
+            fillRef.current?.color.set("#f6c7a4");
+            rimRef.current?.position.copy(center).addScaledVector(anterior, -maxDim * 2.05).addScaledVector(superior, maxDim * 0.55);
+            rimRef.current?.color.set("#c5d4ea");
             transRef.current?.position.copy(center).addScaledVector(superior, -maxDim * 1.15);
 
             const lamp = new THREE.Mesh(
@@ -1452,6 +1571,7 @@ function Specimen() {
               anchors,
             };
             worldRef.current = frame;
+            capRef.current = addSectionCaps(records, scene, maxDim);
             setUnit(unitToMm);
             setBooted(true);
             useLab.getState().publish(directory, { unitToMm, count: records.filter((r) => !r.key.startsWith("env:")).length });
@@ -1586,6 +1706,9 @@ function Specimen() {
     const query = state.query.trim().toLowerCase();
     const pulsePhase = (state.hr > 0 ? (performance.now() / 1000) % (60 / state.hr) : 0) / (60 / Math.max(1, state.hr));
     const pulse = Math.pow(Math.max(0, Math.sin(pulsePhase * Math.PI)), 8);
+    const viewDist = controls ? camera.position.distanceTo(controls.target) : frame.maxDim * 2;
+    const close =
+      state.quality === "low" ? 0 : THREE.MathUtils.smoothstep(frame.maxDim * 1.15, frame.maxDim * 0.38, viewDist);
 
     for (const rec of frame.records) {
       let op = state.visible[rec.cat] ? state.opacity[rec.cat] : 0;
@@ -1620,8 +1743,33 @@ function Specimen() {
       } else if (rec.mesh.position.distanceToSquared(_pos) > 1e-10) {
         rec.mesh.position.lerp(_pos, 1 - Math.exp(-6 * d));
       }
-      if (rec.key === "env:dura") rec.mesh.scale.setScalar(1 + state.retract * 0.1);
-      else if (rec.key === "env:arachnoid") rec.mesh.scale.setScalar(1 + state.retract * 0.045);
+      if (rec.key === "env:dura") {
+        const breath = Math.sin(performance.now() * 0.0015) * 0.0035;
+        rec.mesh.scale.setScalar(1 + state.retract * 0.1 + breath);
+      } else if (rec.key === "env:arachnoid") {
+        const breath = Math.sin(performance.now() * 0.0015 + 0.5) * 0.0024;
+        rec.mesh.scale.setScalar(1 + state.retract * 0.045 + breath);
+      }
+      const caps = rec.mesh.userData.caps as THREE.Mesh[] | undefined;
+      if (caps) {
+        const showCap = state.sectionOn && state.quality !== "low" && rec.mesh.visible && !excised;
+        if (caps[0].visible !== showCap) {
+          caps[0].visible = showCap;
+          caps[1].visible = showCap;
+        }
+      }
+      const tri = rec.mat.userData.tri as
+        | { uClose: { value: number }; uScatter: { value: number }; uPulse: { value: number } }
+        | undefined;
+      if (tri) {
+        const scatter0 = (rec.mat.userData.scatter as number) ?? 0;
+        tri.uScatter.value = state.quality === "low" ? 0 : state.quality === "high" ? scatter0 * 1.2 : scatter0;
+        tri.uClose.value = close;
+        const vesselish = rec.cat === "arteries" || rec.cat === "veins_sinuses" || /choroid/i.test(rec.label);
+        const amp = rec.cat === "arteries" ? 1 : /choroid/i.test(rec.label) ? 0.85 : rec.cat === "veins_sinuses" ? 0.6 : 0;
+        const unit = frame.unitToMm > 50 ? 0.00018 : 0.18;
+        tri.uPulse.value = vesselish && state.quality !== "low" ? pulse * amp * unit : 0;
+      }
 
       const color = state.mode === "parcellation" ? rec.parcel : rec.specimen;
       if (!rec.mat.color.equals(color)) rec.mat.color.copy(color);
@@ -1643,7 +1791,7 @@ function Specimen() {
         rec.mat.emissiveIntensity = 0.42;
       } else if (rec.cat === "arteries" || rec.cat === "veins_sinuses") {
         rec.mat.emissive.copy(rec.specimen).multiplyScalar(0.18);
-        rec.mat.emissiveIntensity = (rec.cat === "arteries" ? 0.1 : 0.06) + pulse * (rec.cat === "arteries" ? 0.62 : 0.28);
+        rec.mat.emissiveIntensity = (rec.cat === "arteries" ? 0.1 : 0.08) + pulse * (rec.cat === "arteries" ? 0.62 : 0.42);
       } else if (/choroid/i.test(rec.label)) {
         rec.mat.emissive.set("#6a3034");
         rec.mat.emissiveIntensity = 0.12 + pulse * 0.4;
@@ -1666,6 +1814,41 @@ function Specimen() {
       rimRef.current.intensity = state.light.rim;
       transRef.current.intensity = state.light.trans;
       keyRef.current.color.copy(WARM).lerp(COOL, state.light.temp);
+    }
+
+    if (qualityRef.current !== state.quality) {
+      qualityRef.current = state.quality;
+      const high = state.quality === "high";
+      const thick = frame.unitToMm > 50 ? 0.0016 : 1.6;
+      const reach = frame.unitToMm > 50 ? 0.004 : 4;
+      for (const rec of frame.records) {
+        const phys = rec.mat as THREE.MeshPhysicalMaterial;
+        if ((rec.cat === "cortex" || rec.cat === "cerebellum" || rec.cat === "brainstem") && phys.isMeshPhysicalMaterial) {
+          phys.transmission = high ? 0.1 : 0;
+          phys.thickness = high ? thick : 0;
+          phys.attenuationDistance = high ? reach : 1e6;
+          phys.attenuationColor.set("#ffb090");
+          phys.needsUpdate = true;
+        }
+        rec.mesh.castShadow = state.quality !== "low" && CAP_CATS.has(rec.cat);
+      }
+      gl.shadowMap.enabled = state.quality !== "low";
+      if (keyRef.current) {
+        keyRef.current.castShadow = state.quality !== "low";
+        const size = state.quality === "high" ? 1024 : 512;
+        keyRef.current.shadow.mapSize.set(size, size);
+        keyRef.current.shadow.map?.dispose();
+        keyRef.current.shadow.map = null;
+      }
+    }
+    if (capRef.current) {
+      const show = state.sectionOn && state.quality !== "low";
+      capRef.current.visible = show;
+      if (show) {
+        capRef.current.position.copy(CLIP.normal).multiplyScalar(-CLIP.constant);
+        _q.setFromUnitVectors(_z, CLIP.normal);
+        capRef.current.quaternion.copy(_q);
+      }
     }
 
     if (controls) {
@@ -1702,12 +1885,21 @@ function Specimen() {
 
   return (
     <>
-      <hemisphereLight args={["#e7e4df", "#1c1816", 0.22]} />
-      <ambientLight intensity={0.1} />
-      <directionalLight ref={keyRef} position={[1, 2, 1]} intensity={1.65} />
-      <directionalLight ref={fillRef} position={[-1.4, 0.35, -0.4]} intensity={0.45} color="#f0e4d8" />
-      <directionalLight ref={rimRef} position={[0.2, 0.8, -1.8]} intensity={0.4} color="#d5e4f2" />
-      <pointLight ref={transRef} position={[0, -1.1, 0.2]} intensity={0.35} color="#ffb090" distance={0} />
+      <hemisphereLight args={["#d5e2ee", "#2a211c", 0.26]} />
+      <ambientLight intensity={0.08} />
+      <directionalLight
+        ref={keyRef}
+        position={[0.2, 2.6, 0.4]}
+        intensity={1.4}
+        color="#d7e6f6"
+        castShadow
+        shadow-mapSize={[512, 512]}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.02}
+      />
+      <directionalLight ref={fillRef} position={[-1.8, 0.35, 0.2]} intensity={0.62} color="#f6c7a4" />
+      <directionalLight ref={rimRef} position={[0.15, 0.65, -2.1]} intensity={0.5} color="#c5d4ea" />
+      <pointLight ref={transRef} position={[0, -1.2, 0.15]} intensity={0.22} color="#ffb090" distance={0} />
       <group ref={rig} />
       <OrbitControls makeDefault enableDamping dampingFactor={0.08} enablePan maxPolarAngle={Math.PI * 0.96} minPolarAngle={0.05} />
       {booted &&
@@ -1747,15 +1939,17 @@ export function Stage() {
         }}
         onCreated={({ gl, scene }) => {
           gl.outputColorSpace = THREE.SRGBColorSpace;
+          gl.shadowMap.enabled = true;
+          gl.shadowMap.type = THREE.PCFSoftShadowMap;
           const maxAniso = gl.capabilities.getMaxAnisotropy();
           for (const tex of tissueTextures()) tex.anisotropy = Math.min(8, maxAniso);
           try {
             const pmrem = new THREE.PMREMGenerator(gl);
-            scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-            scene.environmentIntensity = 0.28;
+            scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.18).texture;
+            scene.environmentIntensity = 0.3;
             pmrem.dispose();
           } catch {
-            scene.environmentIntensity = 0.35;
+            scene.environmentIntensity = 0.28;
           }
         }}
       >

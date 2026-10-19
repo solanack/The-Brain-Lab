@@ -11,6 +11,8 @@ export type Meta = {
   blurb: string;
 };
 
+export type Quality = "low" | "medium" | "high";
+
 export type Axis = "axial" | "coronal" | "sagittal";
 
 export type Intent =
@@ -57,6 +59,7 @@ export type LabState = {
   mag: number;
   strataOn: Record<string, boolean>;
   light: { key: number; fill: number; rim: number; trans: number; temp: number };
+  quality: Quality;
   hr: number;
   turntable: boolean;
   intent: Intent;
@@ -110,7 +113,8 @@ export const useLab = create<LabState>((set, get) => ({
   ...fresh,
   sample: "m1",
   strataOn: {},
-  light: { key: 1.65, fill: 0.45, rim: 0.4, trans: 0.35, temp: 0.34 },
+  light: { key: 1.4, fill: 0.62, rim: 0.5, trans: 0.22, temp: 0.62 },
+  quality: "medium",
   hr: 68,
   turntable: false,
   intent: null,

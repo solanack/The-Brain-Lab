@@ -600,6 +600,7 @@ function Field() {
   const hr = useLab((s) => s.hr);
   const retract = useLab((s) => s.retract);
   const turntable = useLab((s) => s.turntable);
+  const quality = useLab((s) => s.quality);
   const patch = useLab((s) => s.patch);
   const setLight = (key: keyof typeof light, value: number) => patch({ light: { ...useLab.getState().light, [key]: value } });
   return (
@@ -610,6 +611,19 @@ function Field() {
       <Meter label="Rim" min={0} max={3} step={0.05} value={light.rim} format={(v) => v.toFixed(1)} onChange={(v) => setLight("rim", v)} />
       <Meter label="Transillumination" min={0} max={2} step={0.05} value={light.trans} format={(v) => v.toFixed(1)} onChange={(v) => setLight("trans", v)} />
       <Meter label="Color temperature" min={0} max={1} step={0.01} value={light.temp} format={(v) => (v < 0.45 ? "Warm" : v > 0.7 ? "Cool" : "Neutral")} onChange={(v) => setLight("temp", v)} />
+      <div className="mt-2 flex gap-1">
+        {(["low", "medium", "high"] as const).map((level) => (
+          <button
+            key={level}
+            type="button"
+            className={`h-9 flex-1 rounded-full text-xs capitalize ${quality === level ? "bg-primary text-primary-fg" : "bg-surface-2 text-muted"}`}
+            onClick={() => patch({ quality: level })}
+          >
+            {level}
+          </button>
+        ))}
+      </div>
+      <p className="px-1 text-[11px] leading-snug text-muted">Medium is the bench lamp. High adds a thin subsurface glow. Low drops shadows.</p>
       <Meter label="Heart rate" min={40} max={140} step={1} value={hr} format={(v) => `${Math.round(v)} bpm`} onChange={(v) => patch({ hr: v })} />
       <Meter label="Retract dura" min={0} max={1} step={0.01} value={retract} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => patch({ retract: v })} />
       <button type="button" className="h-11 text-left text-sm" onClick={() => patch({ turntable: !turntable })}>

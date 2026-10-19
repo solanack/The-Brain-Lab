@@ -32,8 +32,8 @@ const KINDS: TextureKind[] = [
 ];
 
 const TUNING: Record<TextureKind, { scale: number; bump: number; alpha: number }> = {
-  dura: { scale: 16, bump: 5, alpha: 0 },
-  arachnoid: { scale: 26, bump: 3, alpha: 0.62 },
+  dura: { scale: 16, bump: 6.5, alpha: 0.48 },
+  arachnoid: { scale: 26, bump: 5.5, alpha: 0.7 },
   meninges_dura: { scale: 13, bump: 5, alpha: 0 },
   cortex: { scale: 58, bump: 4, alpha: 0 },
   white_matter: { scale: 30, bump: 2.5, alpha: 0 },
@@ -143,12 +143,13 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const grain = fbm(pu, pv, 7, 4);
     const streak = 0.5 + 0.5 * Math.sin((v * 11 + u * 1.4) * Math.PI * 2);
     const pore = fbm(pu + 0.5, pv, 18, 2);
+    const cells = fbm(pu + 0.15, pv + 0.4, 14, 3);
     return {
-      r: lerp(0.9, 1.05, grain) * lerp(0.96, 1.02, streak),
-      g: lerp(0.88, 1.02, grain),
-      b: lerp(0.86, 0.99, grain),
+      r: lerp(0.9, 1.05, grain) * lerp(0.96, 1.02, streak) * lerp(1, 0.86, cells * 0.35),
+      g: lerp(0.88, 1.02, grain) * lerp(1, 0.84, cells * 0.3),
+      b: lerp(0.86, 0.99, grain) * lerp(1, 0.8, cells * 0.25),
       rough: lerp(0.55, 0.78, pore) * lerp(0.85, 1, 1 - streak),
-      height: 0.48 + (grain - 0.5) * 0.18 + streak * 0.08,
+      height: 0.48 + (grain - 0.5) * 0.18 + streak * 0.08 + cells * 0.16,
       mask: 1,
     };
   }
@@ -197,12 +198,13 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const bundle = Math.abs(Math.sin((u * 7 + fbm(pu, pv, 3, 2)) * Math.PI * 2));
     const fiber = 0.5 + 0.5 * Math.sin((v * 28 + u * 2) * Math.PI * 2);
     const core = smooth(0.2, 0.85, bundle);
+    const endGrain = fbm(pu + 0.2, pv + 0.6, 16, 3);
     return {
-      r: lerp(0.78, 1.08, core) * lerp(0.95, 1.04, fiber),
+      r: lerp(0.78, 1.08, core) * lerp(0.95, 1.04, fiber) * lerp(0.92, 1.04, endGrain),
       g: lerp(0.74, 1.02, core),
       b: lerp(0.66, 0.94, core),
       rough: lerp(0.8, 0.36, fiber * core),
-      height: 0.22 + bundle * 0.55 + fiber * 0.18,
+      height: 0.22 + bundle * 0.55 + fiber * 0.18 + endGrain * 0.2,
       mask: 1,
     };
   }
@@ -213,13 +215,14 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const w2 = Math.abs(Math.sin((v * bands * 0.85 - warp * 1.3) * Math.PI * 2));
     const weave = Math.min(w1, w2);
     const stain = fbm(pu + 0.2, pv + 0.5, 3, 3);
+    const ridge = fbm(pu, pv, 2, 3);
     return {
       r: lerp(0.78, 1.08, stain) * lerp(0.86, 1.05, weave),
       g: lerp(0.76, 1.04, stain) * lerp(0.84, 1.02, weave),
       b: lerp(0.7, 0.96, stain) * lerp(0.8, 0.98, weave),
       rough: lerp(0.95, 0.55, weave),
-      height: 0.2 + weave * 0.7 + stain * 0.1,
-      mask: 1,
+      height: 0.12 + weave * 0.5 + ridge * 0.38,
+      mask: 0.25 + weave * 0.75,
     };
   }
   if (kind === "arachnoid") {
@@ -347,12 +350,18 @@ export function tissueTextures() {
 const TRIPLANAR = /* glsl */ `
 varying vec3 vWPos;
 varying vec3 vWNorm;
+varying vec3 vFiber;
 uniform sampler2D tAlb;
 uniform sampler2D tSurf;
 uniform float uScale;
 uniform float uBump;
 uniform float uAlpha;
+uniform float uClose;
+uniform float uAniso;
+uniform float uScatter;
 vec3 gSurf;
+vec3 gBlend;
+vec3 gP;
 vec3 triBlend(vec3 n) {
   vec3 b = pow(abs(n), vec3(4.0));
   return b / (b.x + b.y + b.z + 1e-4);
@@ -371,11 +380,32 @@ function compileTriplanar(shader: { vertexShader: string; fragmentShader: string
   shader.uniforms.uScale = { value: pack.scale };
   shader.uniforms.uBump = { value: pack.bump };
   shader.uniforms.uAlpha = { value: pack.alpha };
+  shader.uniforms.uClose = { value: 0 };
+  shader.uniforms.uAniso = { value: 0 };
+  shader.uniforms.uScatter = { value: 0 };
+  shader.uniforms.uFiber = { value: new THREE.Vector3(0, 1, 0) };
+  shader.uniforms.uPulse = { value: 0 };
   shader.vertexShader = shader.vertexShader
-    .replace("#include <common>", `#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNorm;`)
+    .replace(
+      "#include <common>",
+      `#include <common>
+varying vec3 vWPos;
+varying vec3 vWNorm;
+varying vec3 vFiber;
+uniform vec3 uFiber;
+uniform float uPulse;`,
+    )
+    .replace(
+      "#include <begin_vertex>",
+      `#include <begin_vertex>
+transformed += objectNormal * uPulse;`,
+    )
     .replace(
       "#include <worldpos_vertex>",
-      `#include <worldpos_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvWNorm = mat3(modelMatrix) * objectNormal;`,
+      `#include <worldpos_vertex>
+vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+vWNorm = mat3(modelMatrix) * objectNormal;
+vFiber = mat3(modelMatrix) * uFiber;`,
     );
   shader.fragmentShader = shader.fragmentShader
     .replace("#include <common>", `#include <common>\n${TRIPLANAR}`)
@@ -383,10 +413,11 @@ function compileTriplanar(shader: { vertexShader: string; fragmentShader: string
       "#include <map_fragment>",
       `#include <map_fragment>
 {
-  vec3 b = triBlend(normalize(vWNorm) * (gl_FrontFacing ? 1.0 : -1.0));
-  vec3 p = vWPos * uScale;
-  gSurf = triRgb(tSurf, p, b);
-  diffuseColor.rgb *= triRgb(tAlb, p, b);
+  vec3 wn = normalize(vWNorm) * (gl_FrontFacing ? 1.0 : -1.0);
+  gBlend = triBlend(wn);
+  gP = vWPos * uScale;
+  gSurf = triRgb(tSurf, gP, gBlend);
+  diffuseColor.rgb *= triRgb(tAlb, gP, gBlend);
   diffuseColor.a *= mix(1.0 - uAlpha, 1.0, gSurf.b);
 }`,
     )
@@ -395,13 +426,34 @@ function compileTriplanar(shader: { vertexShader: string; fragmentShader: string
       `#include <roughnessmap_fragment>
 {
   roughnessFactor = clamp(roughnessFactor * (0.55 + gSurf.g), 0.04, 1.0);
+  float align = abs(dot(normalize(vWNorm), normalize(vFiber + vec3(1e-5))));
+  roughnessFactor = clamp(roughnessFactor * mix(1.0, 0.58, align * uAniso), 0.04, 1.0);
+  if (uClose > 0.04) {
+    float fine = triRgb(tSurf, gP * 3.6, gBlend).g;
+    roughnessFactor = clamp(mix(roughnessFactor, roughnessFactor * (0.68 + fine * 0.6), uClose), 0.04, 1.0);
+  }
 }`,
     )
     .replace(
       "#include <normal_fragment_maps>",
       `#include <normal_fragment_maps>
 {
-  normal = normalize(normal + vec3(dFdx(gSurf.r), dFdy(gSurf.r), 0.0) * uBump);
+  normal = normalize(normal + vec3(dFdx(gSurf.r), dFdy(gSurf.r), 0.0) * uBump * (1.0 + uClose * 0.65));
+}`,
+    )
+    .replace(
+      "#include <lights_physical_fragment>",
+      `#include <lights_physical_fragment>
+#ifdef USE_CLEARCOAT
+  material.clearcoatRoughness = clamp(material.clearcoatRoughness * (0.62 + gSurf.g * 0.7), 0.0525, 1.0);
+#endif`,
+    )
+    .replace(
+      "vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;",
+      `vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;
+{
+  float wrap = pow(clamp(dot(normal, vec3(0.15, 0.95, 0.25)) * 0.55 + 0.45, 0.0, 1.0), 1.5);
+  outgoingLight += vec3(0.62, 0.24, 0.16) * wrap * uScatter * 0.22;
 }`,
     );
 }
@@ -410,9 +462,14 @@ export function applyTriplanar(mat: THREE.Material, kind: TextureKind) {
   ensureTextures();
   const pack = cache.get(kind);
   if (!pack) return;
-  mat.customProgramCacheKey = () => "neurotome-triplanar-v3";
+  mat.customProgramCacheKey = () => "neurotome-triplanar-v4";
   mat.onBeforeCompile = (shader) => {
     compileTriplanar(shader, pack);
+    const fiber = mat.userData.fiber as THREE.Vector3 | undefined;
+    if (fiber) (shader.uniforms.uFiber.value as THREE.Vector3).copy(fiber);
+    shader.uniforms.uAniso.value = (mat.userData.aniso as number) ?? 0;
+    shader.uniforms.uScatter.value = (mat.userData.scatter as number) ?? 0;
+    mat.userData.tri = shader.uniforms;
   };
 }
 
