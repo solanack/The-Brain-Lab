@@ -1,0 +1,21 @@
+Neurotome anatomical meshes
+============================
+
+The file brain.glb and the structure names in manifest.json are derived from
+Z-Anatomy (built on BodyParts3D / DBCLS) and are distributed under
+Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0).
+
+© Z-Anatomy contributors and The Database Center for Life Science (DBCLS),
+via the Brain Project atlas assembly (itayinbarr/brainproject).
+
+Some deep nuclei, thalamic groups, and white-matter tracts were registered
+from open MNI-space atlases (CIT168, Najdenovska thalamic atlas, Neudorfer
+hypothalamic atlas, HCP1065 tract templates). Those structures are approximate
+(about 7 mm) and are for study, not for clinical use. They remain CC BY-SA 4.0.
+
+You may share and adapt the model if you give attribution and distribute
+derivatives under the same license.
+
+The dural and arachnoid envelopes, the laminar tissue window, and the
+laboratory interface are original schematic teaching geometry. They are not
+a scan and not a substitute for an anatomical atlas in the operating room.

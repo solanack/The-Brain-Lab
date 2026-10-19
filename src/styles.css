@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --color-bg: #101416;
+  --color-surface: #171d21;
+  --color-surface-2: #222a2e;
+  --color-fg: #e7eeea;
+  --color-muted: #8e9b96;
+  --color-primary: #3cbfa3;
+  --color-primary-fg: #06221c;
+  --color-border: #2a3432;
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    font-family: var(--font-sans);
+    text-wrap: pretty;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@keyframes perfusion {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  14% {
+    transform: scale(1.45);
+    opacity: 1;
+  }
+  32% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+}
+
+.perfuse {
+  animation: perfusion var(--beat, 0.88s) linear infinite;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .perfuse {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+.vignette {
+  background: radial-gradient(
+    ellipse at center,
+    transparent 48%,
+    color-mix(in srgb, var(--color-bg) 62%, transparent) 100%
+  );
+}
