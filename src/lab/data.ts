@@ -14,6 +14,8 @@ export const CAT_IDS = [
   "arteries",
   "veins_sinuses",
   "cranial_nerves",
+  "globe",
+  "orbit",
 ] as const;
 
 export type CatId = (typeof CAT_IDS)[number];
@@ -227,13 +229,39 @@ export const CATEGORIES: CatMeta[] = [
     rough: 0.46,
     transparent: false,
   },
+  {
+    id: "globe",
+    label: "Globe",
+    group: "Orbit & visual pathway",
+    blurb:
+      "The eyeball, without lids or facial skin. A pale sclera over a darker choroid, with the intraorbital optic nerve continuing CN II onto the posterior pole.",
+    color: "#efe6df",
+    opacity: 1,
+    visible: false,
+    explode: 0.7,
+    rough: 0.4,
+    transparent: false,
+  },
+  {
+    id: "orbit",
+    label: "Orbit",
+    group: "Orbit & visual pathway",
+    blurb:
+      "Extra-ocular muscles and a little orbital fat. The four recti run from the orbital apex to the globe; the obliques are simplified. Hidden until the orbit is opened.",
+    color: "#8f4e44",
+    opacity: 1,
+    visible: false,
+    explode: 0.85,
+    rough: 0.55,
+    transparent: false,
+  },
 ];
 
 export const CAT_BY_ID: Record<CatId, CatMeta> = Object.fromEntries(
   CATEGORIES.map((c) => [c.id, c]),
 ) as Record<CatId, CatMeta>;
 
-export const GROUPS = ["Meninges", "Telencephalon", "Deep gray", "Fluid spaces", "Stem & cerebellum", "Vessels & nerves"];
+export const GROUPS = ["Meninges", "Telencephalon", "Deep gray", "Fluid spaces", "Stem & cerebellum", "Vessels & nerves", "Orbit & visual pathway"];
 
 const PEARLS: Record<string, string> = {
   "precentral gyrus":
@@ -336,6 +364,22 @@ const PEARLS: Record<string, string> = {
     "A small cerebellar lobe of the vestibulocerebellum, concerned with eye movements and balance, sitting near the cerebellopontine angle.",
   insula:
     "Cortex buried in the lateral fissure, under the frontal, parietal, and temporal opercula. It is involved in interoception and taste.",
+  "optic nerve":
+    "Cranial nerve II is a tract of the central nervous system, not a peripheral nerve. It runs from the posterior globe through the orbit and the optic canal to the chiasm.",
+  globe:
+    "The eyeball, about 24 mm across. Sclera in front of a vascular choroid. The optic nerve enters just medial to the posterior pole. Lids and facial skin are not part of this specimen.",
+  "medial rectus":
+    "Adducts the eye. It is the thickest rectus and runs along the medial orbital wall from the annulus of Zinn to the globe.",
+  "lateral rectus":
+    "Abducts the eye and is supplied by the abducens nerve. It follows the lateral orbital wall from the apex to the globe.",
+  "superior rectus":
+    "Elevates, adducts, and intorts the eye. It runs along the orbital roof, above the optic nerve.",
+  "inferior rectus":
+    "Depresses, adducts, and extorts the eye. It lies along the orbital floor.",
+  orbit:
+    "The bony orbit is not shown. What is here is the globe, the extra-ocular muscles, a little fat, and the optic nerve that continues back to the chiasm and, after the radiation, to the calcarine cortex.",
+  "orbital fat":
+    "Lobules of fat fill the orbit around the muscles and the optic nerve. They are simplified so the globe and the recti stay readable.",
 };
 
 const PEARL_LIST = Object.entries(PEARLS).sort((a, b) => b[0].length - a[0].length);
@@ -343,7 +387,11 @@ const PEARL_LIST = Object.entries(PEARLS).sort((a, b) => b[0].length - a[0].leng
 export function pearlFor(label: string, cat: CatId): string {
   const hay = label.toLowerCase();
   for (const [key, text] of PEARL_LIST) {
-    if (hay.includes(key)) return text;
+    const at = hay.indexOf(key);
+    if (at < 0) continue;
+    const before = at === 0 || !/[a-z]/.test(hay[at - 1]!);
+    const after = at + key.length >= hay.length || !/[a-z]/.test(hay[at + key.length]!);
+    if (before && after) return text;
   }
   return CAT_BY_ID[cat]?.blurb ?? "";
 }

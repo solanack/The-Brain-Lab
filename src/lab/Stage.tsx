@@ -156,6 +156,8 @@ function parcelColor(cat: CatId, index: number) {
     arteries: [0.99, 1.02],
     veins_sinuses: [0.58, 0.67],
     cranial_nerves: [0.1, 0.15],
+    globe: [0.04, 0.08],
+    orbit: [0.01, 0.04],
   };
   const [a, b] = span[cat];
   const h = a + ((index * 0.61803398875) % 1) * (b - a);
@@ -180,10 +182,11 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
     cat === "brainstem" ||
     cat === "spinal_cord" ||
     cat === "deep_grey" ||
-    cat === "diencephalon";
+    cat === "diencephalon" ||
+    cat === "orbit";
   const flesh = cat === "cortex" || cat === "cerebellum" || cat === "deep_grey" || cat === "brainstem";
   const vessel = cat === "arteries" || cat === "veins_sinuses";
-  const physical = wet || vessel || cat === "ventricles" || cat === "arachnoid";
+  const physical = wet || vessel || cat === "ventricles" || cat === "arachnoid" || cat === "globe";
   const roughJitter = (hashUnit(seed) - 0.5) * 0.08;
   if (flesh) specimen.offsetHSL((hashUnit(seed + 3) - 0.5) * 0.008, 0, (hashUnit(seed + 9) - 0.5) * 0.012);
   const roughness = flesh
@@ -249,6 +252,20 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
       phys.attenuationColor = new THREE.Color("#e4eef2");
       mat.roughness = 0.18;
     }
+    if (cat === "globe") {
+      phys.roughness = 0.38;
+      phys.clearcoat = 0.14;
+      phys.clearcoatRoughness = 0.5;
+      phys.sheen = 0.06;
+      phys.sheenColor.set("#f0d2c8");
+      phys.transmission = 0.08;
+      phys.thickness = 0.0015;
+      phys.ior = 1.37;
+      phys.attenuationDistance = 0.004;
+      phys.attenuationColor = new THREE.Color("#e7b8aa");
+      phys.envMapIntensity = 0.1;
+      mat.roughness = 0.38;
+    }
   }
   if (cat === "white_matter" || cat === "tracts") {
     mat.roughness = 0.82;
@@ -271,6 +288,8 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
   if (cat === "cortex") mat.color.set("#c9a394");
   if (cat === "white_matter") mat.color.set("#f3eee4");
   if (cat === "tracts") mat.color.set("#efe4cc");
+  if (cat === "globe") mat.color.set("#efe6df");
+  if (cat === "orbit") mat.color.set("#8f4e44");
   specimen.copy(mat.color);
   return mat;
 }
@@ -831,6 +850,13 @@ function visualTarget(rec: Rec, frame: Frame, explode: number, retract: number, 
       if (rec.side === "left") out.addScaledVector(frame.right, -e * md * 0.24);
       if (rec.side === "right") out.addScaledVector(frame.right, e * md * 0.24);
       break;
+    case "globe":
+    case "orbit":
+      out.addScaledVector(frame.anterior, e * md * 0.48);
+      out.addScaledVector(frame.superior, e * md * 0.06);
+      if (rec.side === "left") out.addScaledVector(frame.right, -e * md * 0.62);
+      if (rec.side === "right") out.addScaledVector(frame.right, e * md * 0.62);
+      break;
     default:
       out.addScaledVector(rec.dir, e * rec.weight * md * 0.3);
   }
@@ -846,6 +872,166 @@ function visualTarget(rec: Rec, frame: Frame, explode: number, retract: number, 
 function smoothstep01(e0: number, e1: number, x: number) {
   const t = THREE.MathUtils.clamp((x - e0) / (e1 - e0), 0, 1);
   return t * t * (3 - 2 * t);
+}
+
+function tubeBetween(a: THREE.Vector3, b: THREE.Vector3, r0: number, r1: number, radial = 8) {
+  const dir = b.clone().sub(a);
+  const len = Math.max(dir.length(), 1e-5);
+  const geo = new THREE.CylinderGeometry(Math.max(r1, 1e-5), Math.max(r0, 1e-5), len, radial, 1, false);
+  geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.multiplyScalar(1 / len)));
+  const mid = a.clone().add(b).multiplyScalar(0.5);
+  geo.translate(mid.x, mid.y, mid.z);
+  return geo;
+}
+
+function addOrbitContents(
+  records: Rec[],
+  directory: Meta[],
+  parent: THREE.Object3D,
+  anterior: THREE.Vector3,
+  superior: THREE.Vector3,
+  rightAxis: THREE.Vector3,
+  unitToMm: number,
+) {
+  const mm = (n: number) => n / unitToMm;
+  const nerves = records.filter((r) => /optic nerve/i.test(r.label));
+  const chiasm = records.find((r) => /chiasm/i.test(r.label));
+  const chiasmA = chiasm ? chiasm.restCenter.dot(anterior) : null;
+  const v = new THREE.Vector3();
+  for (const side of ["left", "right"] as const) {
+    const nerve = nerves.find((r) => r.side === side) ?? nerves.find((r) => r.side === "median");
+    if (!nerve) continue;
+    nerve.mesh.updateWorldMatrix(true, false);
+    const pos = nerve.mesh.geometry.getAttribute("position");
+    const pts: THREE.Vector3[] = [];
+    let maxA = -Infinity;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos as THREE.BufferAttribute, i);
+      nerve.mesh.localToWorld(v);
+      const p = v.clone();
+      pts.push(p);
+      const a = p.dot(anterior);
+      if (a > maxA) maxA = a;
+    }
+    if (!pts.length) continue;
+    const band = mm(6);
+    const distal: THREE.Vector3[] = [];
+    const proximal: THREE.Vector3[] = [];
+    for (const p of pts) {
+      const a = p.dot(anterior);
+      if (a > maxA - band) distal.push(p);
+      else if (a > maxA - band * 3) proximal.push(p);
+    }
+    const tip = distal.reduce((acc, p) => acc.add(p), new THREE.Vector3()).multiplyScalar(1 / distal.length);
+    const behind = (proximal.length ? proximal : pts).reduce((acc, p) => acc.add(p), new THREE.Vector3()).multiplyScalar(1 / (proximal.length || pts.length));
+    const lateral = rightAxis.clone().multiplyScalar(side === "right" ? 1 : -1);
+    const forward = tip.clone().sub(behind);
+    if (forward.lengthSq() < 1e-10) forward.copy(anterior);
+    forward.normalize();
+    if (forward.dot(lateral) < 0.12) forward.addScaledVector(lateral, 0.28);
+    forward.addScaledVector(anterior, 0.22).addScaledVector(superior, -0.07).normalize();
+    const reach = chiasmA == null ? 18 : (tip.dot(anterior) - chiasmA) * unitToMm;
+    const extra = reach > 34 ? mm(5) : mm(THREE.MathUtils.clamp(38 - reach, 18, 32));
+    const globeR = mm(12);
+    const center = tip.clone().addScaledVector(forward, extra + globeR * 0.9);
+    let up = superior.clone().addScaledVector(forward, -superior.dot(forward));
+    if (up.lengthSq() < 1e-8) up.copy(rightAxis);
+    up.normalize();
+    const lat = new THREE.Vector3().crossVectors(forward, up).normalize();
+    if (lat.dot(lateral) < 0) lat.negate();
+    const vert = new THREE.Vector3().crossVectors(lat, forward).normalize();
+    if (vert.dot(superior) < 0) {
+      vert.negate();
+      lat.negate();
+    }
+    const pole = center.clone().addScaledVector(forward, -globeR * 0.97);
+    const push = (
+      geo: THREE.BufferGeometry,
+      mat: THREE.MeshStandardMaterial,
+      key: string,
+      label: string,
+      cat: CatId,
+      color?: string,
+    ) => {
+      if (color) mat.color.set(color);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.userData.key = key;
+      parent.add(mesh);
+      const specimen = mat.color.clone();
+      const restCenter = meshCenter(mesh);
+      const outward = side === "left" ? rightAxis.clone().negate() : rightAxis.clone();
+      records.push({
+        key,
+        mesh,
+        mat,
+        cat,
+        side,
+        label,
+        region: "Orbit",
+        hay: `${label} orbit globe optic nerve rectus ${side}`.toLowerCase(),
+        restCenter,
+        restPosition: mesh.position.clone(),
+        dir: outward,
+        radius: meshRadius(mesh),
+        weight: CAT_BY_ID[cat].explode,
+        glassy: false,
+        specimen,
+        parcel: color ? specimen.clone() : parcelColor(cat, label.length + (side === "left" ? 1 : 2)),
+        placed: false,
+      });
+      directory.push({
+        key,
+        label,
+        side,
+        region: "Orbit",
+        cat,
+        ta2: "Orbit",
+        blurb: pearlFor(label, cat),
+      });
+    };
+    const sclera = makeMaterial("globe", new THREE.Color("#efe6df"), side === "left" ? 31 : 32);
+    const choroid = makeMaterial("globe", new THREE.Color("#6e3a36"), side === "left" ? 33 : 34);
+    (choroid as THREE.MeshPhysicalMaterial).transmission = 0;
+    choroid.roughness = 0.74;
+    const nerveMat = makeMaterial("cranial_nerves", new THREE.Color("#e4d4ae"), side === "left" ? 35 : 36);
+    const scleraGeo = new THREE.SphereGeometry(globeR, 28, 20);
+    scleraGeo.translate(center.x, center.y, center.z);
+    const choroidGeo = new THREE.SphereGeometry(globeR * 0.94, 22, 16);
+    choroidGeo.translate(center.x, center.y, center.z);
+    push(scleraGeo, sclera, `orbit:globe:${side}`, "Globe", "globe");
+    push(choroidGeo, choroid, `orbit:choroid:${side}`, "Choroid", "globe", "#6e3a36");
+    push(tubeBetween(tip, pole, mm(1.8), mm(1.5)), nerveMat, `orbit:nerve:${side}`, "Optic nerve (II), intraorbital", "globe", "#e4d4ae");
+    const recti: [string, THREE.Vector3][] = [
+      ["Superior rectus", vert],
+      ["Inferior rectus", vert.clone().negate()],
+      ["Lateral rectus", lat],
+      ["Medial rectus", lat.clone().negate()],
+    ];
+    recti.forEach(([label, axis], index) => {
+      const origin = tip.clone().addScaledVector(axis, mm(3.2)).addScaledVector(forward, mm(2));
+      const insert = axis.clone().multiplyScalar(0.78).addScaledVector(forward, 0.18).normalize().multiplyScalar(globeR).add(center);
+      const mat = makeMaterial("orbit", new THREE.Color("#8f4e44"), 40 + index + (side === "left" ? 0 : 8));
+      push(tubeBetween(origin, insert, mm(2.3), mm(1.15)), mat, `orbit:rectus:${side}:${index}`, label, "orbit");
+    });
+    const trochlea = center.clone().addScaledVector(forward, mm(8)).addScaledVector(lat, -mm(11)).addScaledVector(vert, mm(10));
+    const soInsert = vert.clone().multiplyScalar(0.55).addScaledVector(lat, 0.35).addScaledVector(forward, -0.25).normalize().multiplyScalar(globeR).add(center);
+    const ioOrigin = center.clone().addScaledVector(forward, mm(4)).addScaledVector(lat, -mm(9)).addScaledVector(vert, -mm(7));
+    const ioInsert = lat.clone().multiplyScalar(0.62).addScaledVector(vert, -0.4).addScaledVector(forward, -0.28).normalize().multiplyScalar(globeR).add(center);
+    push(tubeBetween(trochlea, soInsert, mm(1.05), mm(0.85), 6), makeMaterial("orbit", new THREE.Color("#8f4e44"), 60), `orbit:so:${side}`, "Superior oblique", "orbit");
+    push(tubeBetween(ioOrigin, ioInsert, mm(1.15), mm(0.9), 6), makeMaterial("orbit", new THREE.Color("#8f4e44"), 61), `orbit:io:${side}`, "Inferior oblique", "orbit");
+    for (let i = 0; i < 5; i++) {
+      const along = 0.22 + i * 0.14;
+      const spin = (i / 5) * Math.PI * 2 + (side === "left" ? 0.4 : 0);
+      const outward = lat.clone().multiplyScalar(Math.cos(spin)).addScaledVector(vert, Math.sin(spin));
+      const at = tip.clone().lerp(center, along).addScaledVector(outward, mm(5.5 + (i % 2)));
+      const fat = new THREE.SphereGeometry(mm(2.4 + (i % 3) * 0.7), 10, 8);
+      fat.translate(at.x, at.y, at.z);
+      const mat = makeMaterial("orbit", new THREE.Color("#d8c4a6"), 70 + i);
+      mat.roughness = 0.86;
+      (mat as THREE.MeshPhysicalMaterial).clearcoat = 0.02;
+      push(fat, mat, `orbit:fat:${side}:${i}`, "Orbital fat", "orbit", "#d8c4a6");
+    }
+  }
 }
 
 function buildSpinalCord(
@@ -1424,6 +1610,8 @@ function Specimen() {
                 }
               }
             }
+
+            addOrbitContents(records, directory, gltf.scene, anterior, superior, rightAxis, unitToMm);
 
             const anchors: Frame["anchors"] = {};
             for (const recipe of RECIPES) {

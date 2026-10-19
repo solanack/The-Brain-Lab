@@ -357,14 +357,54 @@ function Layers() {
           Tracts
         </Pill>
         <Pill
-          onClick={() =>
+          onClick={() => {
+            const state = useLab.getState();
+            const hidden = { ...state.hidden };
+            for (const item of state.directory) {
+              if (item.cat === "cranial_nerves") hidden[item.key] = false;
+            }
             applyOpacity(
               { cortex: 0.1, brainstem: 0.85, cranial_nerves: 1 },
-              { visible: { ...useLab.getState().visible, cranial_nerves: true } },
-            )
-          }
+              { visible: { ...state.visible, cranial_nerves: true } },
+            );
+            useLab.getState().patch({ hidden });
+          }}
         >
           Nerves
+        </Pill>
+        <Pill
+          onClick={() => {
+            const state = useLab.getState();
+            const hidden = { ...state.hidden };
+            for (const item of state.directory) {
+              if (item.cat === "cranial_nerves") hidden[item.key] = !/optic/i.test(item.label);
+              if (item.cat === "tracts") hidden[item.key] = !/optic radiation/i.test(item.label);
+              if (item.cat === "globe" || item.cat === "orbit") hidden[item.key] = false;
+            }
+            state.patch({
+              hidden,
+              explode: 0.22,
+              isolated: null,
+              sectionOn: false,
+              opacity: {
+                ...state.opacity,
+                cortex: 0.14,
+                white_matter: 0.08,
+                cerebellum: 0.06,
+                brainstem: 0.4,
+                diencephalon: 0.28,
+                globe: 1,
+                orbit: 1,
+                cranial_nerves: 1,
+                tracts: 0.85,
+                dura: 0.04,
+                arachnoid: 0.04,
+              },
+              visible: { ...state.visible, globe: true, orbit: true, cranial_nerves: true, tracts: true },
+            });
+          }}
+        >
+          Visual pathway
         </Pill>
         <Pill
           onClick={() =>

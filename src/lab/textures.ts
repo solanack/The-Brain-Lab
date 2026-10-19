@@ -27,6 +27,8 @@ const KINDS: TextureKind[] = [
   "arteries",
   "veins_sinuses",
   "cranial_nerves",
+  "globe",
+  "orbit",
   "cell",
   "ecm",
 ];
@@ -46,6 +48,8 @@ const TUNING: Record<TextureKind, { scale: number; bump: number; alpha: number }
   arteries: { scale: 52, bump: 2.2, alpha: 0 },
   veins_sinuses: { scale: 32, bump: 2.4, alpha: 0 },
   cranial_nerves: { scale: 44, bump: 4.5, alpha: 0 },
+  globe: { scale: 22, bump: 1.6, alpha: 0 },
+  orbit: { scale: 40, bump: 3.2, alpha: 0 },
   cell: { scale: 40, bump: 3, alpha: 0 },
   ecm: { scale: 24, bump: 2, alpha: 0 },
 };
@@ -275,6 +279,30 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
       b: lerp(0.62, 0.92, edge),
       rough: lerp(0.85, 0.4, fiber),
       height: 0.15 + fasc * 0.7 + fiber * 0.1,
+      mask: 1,
+    };
+  }
+  if (kind === "globe") {
+    const mott = fbm(pu, pv, 5, 3);
+    const vessel = smooth(0.01, 0.05, Math.abs(fbm(pu + 0.2, pv, 9, 3) - 0.5));
+    return {
+      r: lerp(0.9, 1.02, mott) * lerp(0.78, 1, vessel),
+      g: lerp(0.86, 0.98, mott) * lerp(0.7, 1, vessel),
+      b: lerp(0.82, 0.96, mott) * lerp(0.72, 1, vessel),
+      rough: lerp(0.55, 0.32, vessel),
+      height: 0.46 + (mott - 0.5) * 0.08 + (1 - vessel) * 0.2,
+      mask: 1,
+    };
+  }
+  if (kind === "orbit") {
+    const fiber = 0.5 + 0.5 * Math.sin((v * 22 + u * 1.4) * Math.PI * 2);
+    const grain = fbm(pu, pv, 8, 3);
+    return {
+      r: lerp(0.78, 1.05, grain) * lerp(0.9, 1.04, fiber),
+      g: lerp(0.62, 0.92, grain),
+      b: lerp(0.55, 0.82, grain),
+      rough: lerp(0.72, 0.4, fiber),
+      height: 0.3 + fiber * 0.45 + grain * 0.16,
       mask: 1,
     };
   }
