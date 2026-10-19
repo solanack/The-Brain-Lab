@@ -11,7 +11,7 @@ type Pack = {
   alpha: number;
 };
 
-const SIZE = 256;
+const SIZE = 512;
 const KINDS: TextureKind[] = [
   "dura",
   "arachnoid",
@@ -307,7 +307,7 @@ function toTexture(data: Uint8ClampedArray, sizeX = SIZE, sizeY = SIZE) {
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.NoColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
   tex.needsUpdate = true;
   return tex;
 }
@@ -426,6 +426,10 @@ vFiber = mat3(modelMatrix) * uFiber;`,
   gP = vWPos * uScale;
   gSurf = triRgb(tSurf, gP, gBlend);
   vec3 alb = triRgb(tAlb, gP, gBlend);
+  if (uClose > 0.04) {
+    vec3 hi = triRgb(tAlb, gP * 2.5, gBlend);
+    alb = mix(alb, alb * (0.84 + hi * 0.22), uClose * 0.7);
+  }
   diffuseColor.rgb *= alb * 0.88;
   diffuseColor.a *= mix(1.0, mix(1.0 - uAlpha, 1.0, gSurf.b), uDetail);
 }`,
@@ -448,7 +452,9 @@ vFiber = mat3(modelMatrix) * uFiber;`,
       "#include <normal_fragment_maps>",
       `#include <normal_fragment_maps>
 {
-  normal = normalize(normal + vec3(dFdx(gSurf.r), dFdy(gSurf.r), 0.0) * uBump * uDetail * (1.0 + uClose * 0.8));
+  float hi = triRgb(tSurf, gP * 3.2, gBlend).r;
+  vec3 fine = vec3(dFdx(gSurf.r), dFdy(gSurf.r), 0.0) + vec3(dFdx(hi), dFdy(hi), 0.0) * uClose;
+  normal = normalize(normal + fine * uBump * uDetail * (1.0 + uClose * 1.35));
 }`,
     )
     .replace(
@@ -472,7 +478,7 @@ export function applyTriplanar(mat: THREE.Material, kind: TextureKind) {
   ensureTextures();
   const pack = cache.get(kind);
   if (!pack) return;
-  mat.customProgramCacheKey = () => "neurotome-triplanar-v8";
+  mat.customProgramCacheKey = () => "neurotome-triplanar-v9";
   mat.onBeforeCompile = (shader) => {
     compileTriplanar(shader, pack);
     const fiber = mat.userData.fiber as THREE.Vector3 | undefined;
@@ -501,8 +507,8 @@ export function applyRepeating(mat: THREE.MeshStandardMaterial, kind: TextureKin
   mat.bumpScale = bumpScale;
 }
 
-const CORD_U = 256;
-const CORD_V = 512;
+const CORD_U = 512;
+const CORD_V = 1024;
 let cordTex: { alb: THREE.CanvasTexture; surf: THREE.CanvasTexture } | null = null;
 
 function wrapDist(a: number, b: number) {

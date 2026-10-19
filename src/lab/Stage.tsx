@@ -1491,36 +1491,13 @@ function Specimen() {
               new THREE.BoxGeometry(barLen, maxDim * 0.008, maxDim * 0.008),
               new THREE.MeshStandardMaterial({ color: "#d5e4df", metalness: 0.2, roughness: 0.4 }),
             );
-            bar.position.set(center.x, floorY + maxDim * 0.03, center.z + maxDim * 0.72);
+            const barPos = center.clone().addScaledVector(superior, maxDim * 0.18).addScaledVector(rightAxis, maxDim * 0.92).addScaledVector(anterior, maxDim * 0.22);
+            bar.position.copy(barPos);
+            bar.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), rightAxis.clone().normalize());
             const barTag = tagSprite("20 mm", "#d7eeea");
-            barTag.position.set(center.x + barLen * 0.9, floorY + maxDim * 0.08, center.z + maxDim * 0.72);
+            barTag.position.copy(barPos).addScaledVector(superior, maxDim * 0.07);
             barTag.scale.set(maxDim * 0.16, maxDim * 0.08, 1);
-            bar.receiveShadow = true;
             room.add(bar, barTag);
-            const dishMat = new THREE.MeshStandardMaterial({ color: "#1c2426", roughness: 0.62, metalness: 0.28 });
-            const dish = new THREE.Mesh(new THREE.RingGeometry(maxDim * 0.16, maxDim * 1.28, 64), dishMat);
-            dish.rotation.x = -Math.PI / 2;
-            dish.position.set(center.x, floorY, center.z);
-            dish.receiveShadow = true;
-            const lip = new THREE.Mesh(new THREE.TorusGeometry(maxDim * 1.26, maxDim * 0.011, 8, 64), dishMat);
-            lip.rotation.x = Math.PI / 2;
-            lip.position.set(center.x, floorY, center.z);
-            lip.receiveShadow = true;
-            const ao = new THREE.Mesh(
-              new THREE.RingGeometry(maxDim * 0.2, maxDim * 0.92, 48),
-              new THREE.MeshStandardMaterial({ color: "#050708", roughness: 1, transparent: true, opacity: 0.42, depthWrite: false }),
-            );
-            ao.rotation.x = -Math.PI / 2;
-            ao.position.set(center.x, floorY + maxDim * 0.004, center.z);
-            ao.receiveShadow = true;
-            const ground = new THREE.Mesh(
-              new THREE.CircleGeometry(maxDim * 1.35, 48),
-              new THREE.ShadowMaterial({ opacity: 0.4, color: "#050708" }),
-            );
-            ground.rotation.x = -Math.PI / 2;
-            ground.position.set(center.x, floorY + maxDim * 0.002, center.z);
-            ground.receiveShadow = true;
-            room.add(dish, lip, ao, ground);
             const trayOrigin = new THREE.Vector3(center.x + maxDim * 1.15, floorY, center.z);
 
             const leftMark = tagSprite("L", "#9eb0aa");
