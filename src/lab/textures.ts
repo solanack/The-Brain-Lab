@@ -115,11 +115,11 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const vein = smooth(0.012, 0.07, Math.abs(fbm(pu, pv + 0.3, 8, 4) - 0.5));
     const cap = smooth(0.008, 0.04, Math.abs(fbm(pu + 0.6, pv, 16, 3) - 0.47));
     const open = vein * cap;
-    const base = lerp(0.74, 0.9, blot);
+    const base = lerp(0.58, 0.74, blot);
     return {
-      r: Math.min(0.94, base * lerp(0.78, 1, open)),
-      g: Math.min(0.86, base * lerp(0.58, 0.9, open) * lerp(0.96, 1.02, pores)),
-      b: Math.min(0.8, base * lerp(0.5, 0.86, open)),
+      r: Math.min(0.86, base * lerp(0.8, 1, open)),
+      g: Math.min(0.72, base * lerp(0.52, 0.86, open) * lerp(0.96, 1.01, pores)),
+      b: Math.min(0.64, base * lerp(0.46, 0.78, open)),
       rough: lerp(0.78, 0.46, open) * lerp(0.92, 1.05, pores),
       height: 0.42 + (pores - 0.5) * 0.22 + (1 - vein) * 0.38 + (1 - cap) * 0.16,
       mask: 1,
@@ -425,7 +425,7 @@ vFiber = mat3(modelMatrix) * uFiber;`,
   gP = vWPos * uScale;
   gSurf = triRgb(tSurf, gP, gBlend);
   vec3 alb = triRgb(tAlb, gP, gBlend);
-  diffuseColor.rgb *= mix(vec3(1.0), alb, uDetail);
+  diffuseColor.rgb *= alb * 0.85;
   diffuseColor.a *= mix(1.0, mix(1.0 - uAlpha, 1.0, gSurf.b), uDetail);
 }`,
     )
@@ -471,7 +471,7 @@ export function applyTriplanar(mat: THREE.Material, kind: TextureKind) {
   ensureTextures();
   const pack = cache.get(kind);
   if (!pack) return;
-  mat.customProgramCacheKey = () => "neurotome-triplanar-v6";
+  mat.customProgramCacheKey = () => "neurotome-triplanar-v7";
   mat.onBeforeCompile = (shader) => {
     compileTriplanar(shader, pack);
     const fiber = mat.userData.fiber as THREE.Vector3 | undefined;
