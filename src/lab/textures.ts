@@ -115,12 +115,12 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const vein = smooth(0.012, 0.07, Math.abs(fbm(pu, pv + 0.3, 8, 4) - 0.5));
     const cap = smooth(0.008, 0.04, Math.abs(fbm(pu + 0.6, pv, 16, 3) - 0.47));
     const open = vein * cap;
-    const base = lerp(0.9, 1.06, blot);
+    const base = lerp(0.74, 0.9, blot);
     return {
-      r: base * lerp(0.72, 1, open),
-      g: base * lerp(0.58, 1, open) * lerp(0.96, 1.02, pores),
-      b: base * lerp(0.55, 0.98, open),
-      rough: lerp(0.72, 0.34, open) * lerp(0.9, 1.08, pores),
+      r: Math.min(0.94, base * lerp(0.78, 1, open)),
+      g: Math.min(0.86, base * lerp(0.58, 0.9, open) * lerp(0.96, 1.02, pores)),
+      b: Math.min(0.8, base * lerp(0.5, 0.86, open)),
+      rough: lerp(0.78, 0.46, open) * lerp(0.92, 1.05, pores),
       height: 0.42 + (pores - 0.5) * 0.22 + (1 - vein) * 0.38 + (1 - cap) * 0.16,
       mask: 1,
     };
@@ -131,9 +131,9 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const grain = fbm(pu + 0.4, pv, 20, 3);
     const groove = smooth(0.15, 0.55, folia);
     return {
-      r: lerp(0.78, 1.05, groove),
-      g: lerp(0.7, 1.02, groove),
-      b: lerp(0.68, 0.98, groove),
+      r: lerp(0.72, 0.92, groove),
+      g: lerp(0.64, 0.86, groove),
+      b: lerp(0.6, 0.8, groove),
       rough: lerp(0.85, 0.38, groove),
       height: 0.18 + folia * 0.72 + (grain - 0.5) * 0.08,
       mask: 1,
@@ -145,9 +145,9 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const pore = fbm(pu + 0.5, pv, 18, 2);
     const cells = fbm(pu + 0.15, pv + 0.4, 14, 3);
     return {
-      r: lerp(0.9, 1.05, grain) * lerp(0.96, 1.02, streak) * lerp(1, 0.86, cells * 0.35),
-      g: lerp(0.88, 1.02, grain) * lerp(1, 0.84, cells * 0.3),
-      b: lerp(0.86, 0.99, grain) * lerp(1, 0.8, cells * 0.25),
+      r: Math.min(0.92, lerp(0.76, 0.9, grain) * lerp(0.96, 1.02, streak)),
+      g: Math.min(0.86, lerp(0.72, 0.86, grain)),
+      b: Math.min(0.8, lerp(0.68, 0.82, grain)),
       rough: lerp(0.55, 0.78, pore) * lerp(0.85, 1, 1 - streak),
       height: 0.48 + (grain - 0.5) * 0.18 + streak * 0.08 + cells * 0.16,
       mask: 1,
@@ -159,9 +159,9 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const stripe = 0.5 + 0.5 * Math.sin((u * 9 + warpish(pu, pv)) * Math.PI * 2);
     const speck = grain > 0.62 || grain < 0.38 ? 1 : 0;
     return {
-      r: lerp(0.82, 1.08, island) * lerp(0.94, 1.04, stripe) * (speck ? 0.9 : 1),
-      g: lerp(0.78, 1.02, island) * (speck ? 0.86 : 1),
-      b: lerp(0.76, 0.98, island),
+      r: Math.min(0.9, lerp(0.7, 0.88, island) * (speck ? 0.9 : 1)),
+      g: Math.min(0.82, lerp(0.64, 0.82, island) * (speck ? 0.86 : 1)),
+      b: Math.min(0.76, lerp(0.6, 0.78, island)),
       rough: lerp(0.5, 0.9, grain),
       height: 0.4 + grain * 0.35 + (1 - stripe) * 0.12,
       mask: 1,
@@ -171,9 +171,9 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const domain = fbm(pu, pv, 3, 4);
     const grain = fbm(pu + 0.7, pv, 12, 3);
     return {
-      r: lerp(0.9, 1.06, domain),
-      g: lerp(0.86, 1.02, domain) * lerp(0.96, 1.03, grain),
-      b: lerp(0.84, 0.99, domain),
+      r: lerp(0.76, 0.92, domain),
+      g: lerp(0.7, 0.86, domain) * lerp(0.96, 1.02, grain),
+      b: lerp(0.66, 0.8, domain),
       rough: lerp(0.48, 0.8, grain),
       height: 0.46 + (domain - 0.5) * 0.28 + (grain - 0.5) * 0.1,
       mask: 1,
@@ -186,9 +186,9 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const sheen = along * 0.62 + cross * 0.38;
     const pale = kind === "ecm" ? 0.5 : 1;
     return {
-      r: lerp(0.9, 1.08, pearl) * lerp(0.94, 1.04, sheen),
-      g: lerp(0.9, 1.05, pearl) * lerp(0.95, 1.02, sheen),
-      b: lerp(0.88, 1.0, pearl) * lerp(0.9, 0.98, sheen),
+      r: Math.min(1.02, lerp(0.9, 0.98, pearl) * lerp(0.96, 1.02, sheen)),
+      g: Math.min(1.0, lerp(0.9, 0.97, pearl) * lerp(0.96, 1.0, sheen)),
+      b: Math.min(0.96, lerp(0.88, 0.94, pearl) * lerp(0.94, 0.98, sheen)),
       rough: lerp(0.78, 0.32, sheen) * pale + (1 - pale) * 0.7,
       height: 0.5 + (sheen - 0.5) * 0.22 + (pearl - 0.5) * 0.08,
       mask: 1,
@@ -200,9 +200,9 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const core = smooth(0.2, 0.85, bundle);
     const endGrain = fbm(pu + 0.2, pv + 0.6, 16, 3);
     return {
-      r: lerp(0.78, 1.08, core) * lerp(0.95, 1.04, fiber) * lerp(0.92, 1.04, endGrain),
-      g: lerp(0.74, 1.02, core),
-      b: lerp(0.66, 0.94, core),
+      r: Math.min(1.0, lerp(0.82, 0.98, core) * lerp(0.96, 1.02, fiber)),
+      g: Math.min(0.96, lerp(0.78, 0.94, core)),
+      b: Math.min(0.9, lerp(0.72, 0.88, core)),
       rough: lerp(0.8, 0.36, fiber * core),
       height: 0.22 + bundle * 0.55 + fiber * 0.18 + endGrain * 0.2,
       mask: 1,
@@ -454,7 +454,7 @@ vFiber = mat3(modelMatrix) * uFiber;`,
       "#include <lights_physical_fragment>",
       `#include <lights_physical_fragment>
 #ifdef USE_CLEARCOAT
-  material.clearcoatRoughness = clamp(material.clearcoatRoughness * (0.62 + gSurf.g * 0.7), 0.0525, 1.0);
+  material.clearcoatRoughness = clamp(material.clearcoatRoughness * (0.88 + gSurf.g * 0.28), 0.2, 1.0);
 #endif`,
     )
     .replace(
@@ -462,7 +462,7 @@ vFiber = mat3(modelMatrix) * uFiber;`,
       `vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;
 {
   float wrap = pow(clamp(dot(normal, vec3(0.15, 0.95, 0.25)) * 0.55 + 0.45, 0.0, 1.0), 1.5);
-  outgoingLight += vec3(0.72, 0.28, 0.16) * wrap * uScatter * 0.26;
+  outgoingLight += vec3(0.42, 0.14, 0.1) * wrap * uScatter * 0.07;
 }`,
     );
 }
@@ -471,7 +471,7 @@ export function applyTriplanar(mat: THREE.Material, kind: TextureKind) {
   ensureTextures();
   const pack = cache.get(kind);
   if (!pack) return;
-  mat.customProgramCacheKey = () => "neurotome-triplanar-v5";
+  mat.customProgramCacheKey = () => "neurotome-triplanar-v6";
   mat.onBeforeCompile = (shader) => {
     compileTriplanar(shader, pack);
     const fiber = mat.userData.fiber as THREE.Vector3 | undefined;

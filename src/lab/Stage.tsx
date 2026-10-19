@@ -197,7 +197,7 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
     color: specimen,
     roughness,
     metalness: vessel ? 0.12 : 0.02,
-    envMapIntensity: vessel ? 0.7 : cat === "cortex" || cat === "cerebellum" ? 0.38 : wet ? 0.32 : 0.4,
+    envMapIntensity: vessel ? 0.45 : cat === "cortex" || cat === "cerebellum" ? 0.16 : wet ? 0.18 : 0.28,
     side: sheet ? THREE.DoubleSide : THREE.FrontSide,
     transparent: glassy || meta.transparent,
     opacity: meta.opacity,
@@ -205,8 +205,8 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
   });
   if (physical) {
     const phys = mat as THREE.MeshPhysicalMaterial;
-    phys.clearcoat = wet || vessel ? 0.16 : 0;
-    phys.clearcoatRoughness = wet ? 0.42 : 0.5;
+    phys.clearcoat = wet || vessel ? 0.08 : 0;
+    phys.clearcoatRoughness = wet ? 0.55 : 0.5;
     phys.sheen = wet ? 0.12 : 0;
     phys.sheenRoughness = 0.55;
     phys.sheenColor.set("#a87468");
@@ -253,7 +253,7 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
   mat.userData.rough0 = mat.roughness;
   mat.userData.coat0 = (mat as THREE.MeshPhysicalMaterial).clearcoat ?? 0;
   mat.userData.aniso = cat === "tracts" ? 0.34 : cat === "white_matter" ? 0.24 : cat === "brainstem" ? 0.12 : 0;
-  mat.userData.scatter = cat === "cortex" || cat === "cerebellum" ? 0.55 : cat === "brainstem" ? 0.34 : cat === "deep_grey" ? 0.16 : 0;
+  mat.userData.scatter = cat === "cortex" || cat === "cerebellum" ? 0.22 : cat === "brainstem" ? 0.16 : cat === "deep_grey" ? 0.08 : 0;
   mat.userData.fiber = new THREE.Vector3(0, 1, 0);
   if (vessel) {
     mat.polygonOffset = true;
@@ -1812,11 +1812,11 @@ function Specimen() {
         const coat0 = (rec.mat.userData.coat0 as number) ?? 0.16;
         rec.mat.roughness = dull ? 0.78 : rough0;
         rec.mat.metalness = 0.02;
-        rec.mat.envMapIntensity = dull ? 0.16 : rec.cat === "spinal_cord" ? 0.45 : rec.cat === "deep_grey" || rec.cat === "brainstem" ? 0.3 : 0.38;
+        rec.mat.envMapIntensity = dull ? 0.1 : rec.cat === "spinal_cord" ? 0.22 : rec.cat === "deep_grey" || rec.cat === "brainstem" ? 0.14 : 0.16;
         if (phys.isMeshPhysicalMaterial) {
           const film = !dull && state.quality === "high" && rec.cat === "cortex" && phys.iridescence > 0 ? close : 0;
-          phys.clearcoat = dull ? 0.02 : coat0 + pulse * 0.04 + film * 0.2;
-          phys.clearcoatRoughness = dull ? 0.62 : Math.max(0.08, 0.36 - film * 0.22);
+          phys.clearcoat = dull ? 0.02 : coat0 + pulse * 0.02 + film * 0.08;
+          phys.clearcoatRoughness = dull ? 0.72 : Math.max(0.28, 0.55 - film * 0.12);
           phys.sheen = dull ? 0.02 : rec.cat === "spinal_cord" ? 0.16 : 0.12;
           if (film > 0) phys.iridescence = 0.012 + film * 0.15;
         }
@@ -1833,7 +1833,7 @@ function Specimen() {
       } else if (rec.cat === "cortex" || rec.cat === "cerebellum" || rec.cat === "deep_grey" || rec.cat === "brainstem") {
         const dull = rec.cat === "cortex" && !state.piaOn;
         rec.mat.emissive.set(dull ? "#000000" : "#3d1816");
-        rec.mat.emissiveIntensity = dull ? 0 : 0.02 + pulse * 0.02;
+        rec.mat.emissiveIntensity = dull ? 0 : 0.008 + pulse * 0.008;
       } else if (rec.cat === "spinal_cord") {
         rec.mat.emissive.set("#5a4038");
         rec.mat.emissiveIntensity = 0.02 + pulse * 0.02;
@@ -1933,20 +1933,20 @@ function Specimen() {
 
   return (
     <>
-      <hemisphereLight args={["#d5e2ee", "#2a211c", 0.26]} />
-      <ambientLight intensity={0.08} />
+      <hemisphereLight args={["#d5e2ee", "#2a211c", 0.14]} />
+      <ambientLight intensity={0.05} />
       <directionalLight
         ref={keyRef}
         position={[0.2, 2.6, 0.4]}
-        intensity={1.35}
+        intensity={0.95}
         color="#e4eef8"
         castShadow
         shadow-mapSize={[512, 512]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
       />
-      <directionalLight ref={fillRef} position={[-1.8, 0.35, 0.2]} intensity={0.7} color="#ffc08a" />
-      <directionalLight ref={rimRef} position={[0.15, 0.65, -2.1]} intensity={0.42} color="#c5d6ea" />
+      <directionalLight ref={fillRef} position={[-1.8, 0.35, 0.2]} intensity={0.38} color="#ffc08a" />
+      <directionalLight ref={rimRef} position={[0.15, 0.65, -2.1]} intensity={0.28} color="#c5d6ea" />
       <pointLight ref={transRef} position={[0, -1.2, 0.15]} intensity={0.18} color="#ffb090" distance={0} />
       <group ref={rig} />
       <OrbitControls makeDefault enableDamping dampingFactor={0.08} enablePan maxPolarAngle={Math.PI * 0.96} minPolarAngle={0.05} />
@@ -1994,10 +1994,10 @@ export function Stage() {
           try {
             const pmrem = new THREE.PMREMGenerator(gl);
             scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.18).texture;
-            scene.environmentIntensity = 0.24;
+            scene.environmentIntensity = 0.14;
             pmrem.dispose();
           } catch {
-            scene.environmentIntensity = 0.28;
+            scene.environmentIntensity = 0.16;
           }
         }}
       >
