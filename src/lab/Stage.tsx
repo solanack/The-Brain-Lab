@@ -197,7 +197,7 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
     color: specimen,
     roughness,
     metalness: vessel ? 0.12 : 0.02,
-    envMapIntensity: vessel ? 0.35 : cat === "cortex" || cat === "cerebellum" ? 0.06 : wet ? 0.08 : 0.16,
+    envMapIntensity: vessel ? 0.35 : cat === "cortex" || cat === "cerebellum" ? 0.06 : cat === "white_matter" || cat === "tracts" ? 0.03 : wet ? 0.08 : 0.12,
     side: sheet ? THREE.DoubleSide : THREE.FrontSide,
     transparent: glassy || meta.transparent,
     opacity: meta.opacity,
@@ -250,6 +250,11 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
       mat.roughness = 0.18;
     }
   }
+  if (cat === "white_matter" || cat === "tracts") {
+    mat.roughness = 0.82;
+    mat.metalness = 0;
+    mat.envMapIntensity = 0.03;
+  }
   mat.userData.rough0 = mat.roughness;
   mat.userData.coat0 = (mat as THREE.MeshPhysicalMaterial).clearcoat ?? 0;
   mat.userData.aniso = cat === "tracts" ? 0.34 : cat === "white_matter" ? 0.24 : cat === "brainstem" ? 0.12 : 0;
@@ -265,6 +270,7 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
   mat.color.set(CAT_BY_ID[cat].color);
   if (cat === "cortex") mat.color.set("#c9a394");
   if (cat === "white_matter") mat.color.set("#f3eee4");
+  if (cat === "tracts") mat.color.set("#efe4cc");
   specimen.copy(mat.color);
   return mat;
 }
@@ -1824,6 +1830,12 @@ function Specimen() {
           phys.sheen = dull ? 0.01 : rec.cat === "spinal_cord" ? 0.1 : rec.cat === "cortex" || rec.cat === "cerebellum" ? 0.04 : 0.07;
           if (film > 0) phys.iridescence = 0.008 + film * 0.06;
         }
+      }
+      if (rec.cat === "white_matter" || rec.cat === "tracts") {
+        rec.mat.color.set(state.mode === "parcellation" ? rec.parcel : rec.cat === "white_matter" ? "#f3eee4" : "#efe4cc");
+        rec.mat.envMapIntensity = 0.03;
+        rec.mat.metalness = 0;
+        rec.mat.roughness = 0.82;
       }
       if (state.selected === rec.key && rec.cat !== "arteries" && rec.cat !== "veins_sinuses") {
         rec.mat.emissive.set("#123f36");

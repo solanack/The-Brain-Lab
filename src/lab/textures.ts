@@ -185,11 +185,12 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const pearl = fbm(pu, pv, 4, 4);
     const sheen = along * 0.62 + cross * 0.38;
     const pale = kind === "ecm" ? 0.5 : 1;
+    const tone = lerp(0.84, 0.93, pearl);
     return {
-      r: Math.min(1.02, lerp(0.9, 0.98, pearl) * lerp(0.96, 1.02, sheen)),
-      g: Math.min(1.0, lerp(0.9, 0.97, pearl) * lerp(0.96, 1.0, sheen)),
-      b: Math.min(0.96, lerp(0.88, 0.94, pearl) * lerp(0.94, 0.98, sheen)),
-      rough: lerp(0.78, 0.32, sheen) * pale + (1 - pale) * 0.7,
+      r: Math.min(0.94, tone * lerp(0.96, 1, sheen * 0.35)),
+      g: Math.min(0.92, tone * 0.985),
+      b: Math.min(0.88, tone * 0.95),
+      rough: (lerp(0.88, 0.7, sheen) * pale) + (1 - pale) * 0.72,
       height: 0.5 + (sheen - 0.5) * 0.22 + (pearl - 0.5) * 0.08,
       mask: 1,
     };
@@ -200,10 +201,10 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const core = smooth(0.2, 0.85, bundle);
     const endGrain = fbm(pu + 0.2, pv + 0.6, 16, 3);
     return {
-      r: Math.min(1.0, lerp(0.82, 0.98, core) * lerp(0.96, 1.02, fiber)),
-      g: Math.min(0.96, lerp(0.78, 0.94, core)),
-      b: Math.min(0.9, lerp(0.72, 0.88, core)),
-      rough: lerp(0.8, 0.36, fiber * core),
+      r: Math.min(0.94, lerp(0.8, 0.92, core) * lerp(0.97, 1, fiber * 0.4)),
+      g: Math.min(0.91, lerp(0.76, 0.9, core)),
+      b: Math.min(0.86, lerp(0.7, 0.84, core)),
+      rough: lerp(0.86, 0.68, fiber * core),
       height: 0.22 + bundle * 0.55 + fiber * 0.18 + endGrain * 0.2,
       mask: 1,
     };
@@ -425,7 +426,7 @@ vFiber = mat3(modelMatrix) * uFiber;`,
   gP = vWPos * uScale;
   gSurf = triRgb(tSurf, gP, gBlend);
   vec3 alb = triRgb(tAlb, gP, gBlend);
-  diffuseColor.rgb *= alb * 0.85;
+  diffuseColor.rgb *= alb * 0.88;
   diffuseColor.a *= mix(1.0, mix(1.0 - uAlpha, 1.0, gSurf.b), uDetail);
 }`,
     )
@@ -471,7 +472,7 @@ export function applyTriplanar(mat: THREE.Material, kind: TextureKind) {
   ensureTextures();
   const pack = cache.get(kind);
   if (!pack) return;
-  mat.customProgramCacheKey = () => "neurotome-triplanar-v7";
+  mat.customProgramCacheKey = () => "neurotome-triplanar-v8";
   mat.onBeforeCompile = (shader) => {
     compileTriplanar(shader, pack);
     const fiber = mat.userData.fiber as THREE.Vector3 | undefined;
