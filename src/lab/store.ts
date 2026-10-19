@@ -113,7 +113,7 @@ export const useLab = create<LabState>((set, get) => ({
   ...fresh,
   sample: "m1",
   strataOn: {},
-  light: { key: 1.4, fill: 0.62, rim: 0.5, trans: 0.22, temp: 0.62 },
+  light: { key: 1.35, fill: 0.7, rim: 0.42, trans: 0.18, temp: 0.76 },
   quality: "medium",
   hr: 68,
   turntable: false,

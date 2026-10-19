@@ -623,7 +623,7 @@ function Field() {
           </button>
         ))}
       </div>
-      <p className="px-1 text-[11px] leading-snug text-muted">Medium is the bench lamp. High adds a thin subsurface glow. Low drops shadows.</p>
+      <p className="px-1 text-[11px] leading-snug text-muted">Medium keeps the wet film and maps. High adds subsurface glow, fiber sheen, and close-up grain. Low is the plain specimen.</p>
       <Meter label="Heart rate" min={40} max={140} step={1} value={hr} format={(v) => `${Math.round(v)} bpm`} onChange={(v) => patch({ hr: v })} />
       <Meter label="Retract dura" min={0} max={1} step={0.01} value={retract} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => patch({ retract: v })} />
       <button type="button" className="h-11 text-left text-sm" onClick={() => patch({ turntable: !turntable })}>

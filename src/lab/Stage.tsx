@@ -236,18 +236,23 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
       mat.roughness = 0.36;
     }
     if (cat === "arachnoid") {
-      phys.iridescence = 0.26;
-      phys.iridescenceIOR = 1.34;
-      phys.iridescenceThicknessRange = [90, 360];
-      phys.roughness = 0.16;
-      phys.clearcoat = 0.42;
-      phys.clearcoatRoughness = 0.2;
-      mat.roughness = 0.16;
+      phys.iridescence = 0.14;
+      phys.iridescenceIOR = 1.36;
+      phys.iridescenceThicknessRange = [80, 280];
+      phys.roughness = 0.18;
+      phys.clearcoat = 0.35;
+      phys.clearcoatRoughness = 0.22;
+      phys.transmission = 0.04;
+      phys.thickness = 0.00035;
+      phys.ior = 1.38;
+      phys.attenuationDistance = 0.008;
+      phys.attenuationColor = new THREE.Color("#e4eef2");
+      mat.roughness = 0.18;
     }
   }
   mat.userData.rough0 = mat.roughness;
   mat.userData.coat0 = (mat as THREE.MeshPhysicalMaterial).clearcoat ?? 0;
-  mat.userData.aniso = cat === "tracts" ? 0.32 : cat === "white_matter" ? 0.22 : cat === "brainstem" ? 0.14 : 0;
+  mat.userData.aniso = cat === "tracts" ? 0.34 : cat === "white_matter" ? 0.24 : cat === "brainstem" ? 0.12 : 0;
   mat.userData.scatter = cat === "cortex" || cat === "cerebellum" ? 0.55 : cat === "brainstem" ? 0.34 : cat === "deep_grey" ? 0.16 : 0;
   mat.userData.fiber = new THREE.Vector3(0, 1, 0);
   if (vessel) {
@@ -1069,8 +1074,8 @@ function addSectionCaps(records: Rec[], scene: THREE.Scene, radius: number) {
     rec.mesh.renderOrder = 3;
   }
   const capMat = new THREE.MeshStandardMaterial({
-    color: "#c8beb4",
-    roughness: 0.96,
+    color: "#b7c3c1",
+    roughness: 0.98,
     metalness: 0,
     side: THREE.DoubleSide,
     polygonOffset: true,
@@ -1480,15 +1485,32 @@ function Specimen() {
             const barTag = tagSprite("20 mm", "#d7eeea");
             barTag.position.set(center.x + barLen * 0.9, floorY + maxDim * 0.08, center.z + maxDim * 0.72);
             barTag.scale.set(maxDim * 0.16, maxDim * 0.08, 1);
+            bar.receiveShadow = true;
             room.add(bar, barTag);
+            const dishMat = new THREE.MeshStandardMaterial({ color: "#1c2426", roughness: 0.62, metalness: 0.28 });
+            const dish = new THREE.Mesh(new THREE.RingGeometry(maxDim * 0.16, maxDim * 1.28, 64), dishMat);
+            dish.rotation.x = -Math.PI / 2;
+            dish.position.set(center.x, floorY, center.z);
+            dish.receiveShadow = true;
+            const lip = new THREE.Mesh(new THREE.TorusGeometry(maxDim * 1.26, maxDim * 0.011, 8, 64), dishMat);
+            lip.rotation.x = Math.PI / 2;
+            lip.position.set(center.x, floorY, center.z);
+            lip.receiveShadow = true;
+            const ao = new THREE.Mesh(
+              new THREE.RingGeometry(maxDim * 0.2, maxDim * 0.92, 48),
+              new THREE.MeshStandardMaterial({ color: "#050708", roughness: 1, transparent: true, opacity: 0.42, depthWrite: false }),
+            );
+            ao.rotation.x = -Math.PI / 2;
+            ao.position.set(center.x, floorY + maxDim * 0.004, center.z);
+            ao.receiveShadow = true;
             const ground = new THREE.Mesh(
-              new THREE.CircleGeometry(maxDim * 2.8, 48),
-              new THREE.ShadowMaterial({ opacity: 0.34, color: "#050708" }),
+              new THREE.CircleGeometry(maxDim * 1.35, 48),
+              new THREE.ShadowMaterial({ opacity: 0.4, color: "#050708" }),
             );
             ground.rotation.x = -Math.PI / 2;
-            ground.position.set(center.x, floorY, center.z);
+            ground.position.set(center.x, floorY + maxDim * 0.002, center.z);
             ground.receiveShadow = true;
-            room.add(ground);
+            room.add(dish, lip, ao, ground);
             const trayOrigin = new THREE.Vector3(center.x + maxDim * 1.15, floorY, center.z);
 
             const leftMark = tagSprite("L", "#9eb0aa");
@@ -1528,12 +1550,12 @@ function Specimen() {
               shadowCam.updateProjectionMatrix();
               scene.add(keyRef.current.target);
               keyRef.current.target.position.copy(center);
-              keyRef.current.color.set("#d7e6f6");
+              keyRef.current.color.set("#e4eef8");
             }
             fillRef.current?.position.copy(center).addScaledVector(rightAxis, maxDim * 1.7).addScaledVector(superior, maxDim * 0.25);
-            fillRef.current?.color.set("#f6c7a4");
+            fillRef.current?.color.set("#ffc08a");
             rimRef.current?.position.copy(center).addScaledVector(anterior, -maxDim * 2.05).addScaledVector(superior, maxDim * 0.55);
-            rimRef.current?.color.set("#c5d4ea");
+            rimRef.current?.color.set("#c5d6ea");
             transRef.current?.position.copy(center).addScaledVector(superior, -maxDim * 1.15);
 
             const lamp = new THREE.Mesh(
@@ -1708,7 +1730,7 @@ function Specimen() {
     const pulse = Math.pow(Math.max(0, Math.sin(pulsePhase * Math.PI)), 8);
     const viewDist = controls ? camera.position.distanceTo(controls.target) : frame.maxDim * 2;
     const close =
-      state.quality === "low" ? 0 : THREE.MathUtils.smoothstep(frame.maxDim * 1.15, frame.maxDim * 0.38, viewDist);
+      state.quality === "high" ? THREE.MathUtils.smoothstep(frame.maxDim * 1.15, frame.maxDim * 0.38, viewDist) : 0;
 
     for (const rec of frame.records) {
       let op = state.visible[rec.cat] ? state.opacity[rec.cat] : 0;
@@ -1743,13 +1765,8 @@ function Specimen() {
       } else if (rec.mesh.position.distanceToSquared(_pos) > 1e-10) {
         rec.mesh.position.lerp(_pos, 1 - Math.exp(-6 * d));
       }
-      if (rec.key === "env:dura") {
-        const breath = Math.sin(performance.now() * 0.0015) * 0.0035;
-        rec.mesh.scale.setScalar(1 + state.retract * 0.1 + breath);
-      } else if (rec.key === "env:arachnoid") {
-        const breath = Math.sin(performance.now() * 0.0015 + 0.5) * 0.0024;
-        rec.mesh.scale.setScalar(1 + state.retract * 0.045 + breath);
-      }
+      if (rec.key === "env:dura") rec.mesh.scale.setScalar(1 + state.retract * 0.1);
+      else if (rec.key === "env:arachnoid") rec.mesh.scale.setScalar(1 + state.retract * 0.045);
       const caps = rec.mesh.userData.caps as THREE.Mesh[] | undefined;
       if (caps) {
         const showCap = state.sectionOn && state.quality !== "low" && rec.mesh.visible && !excised;
@@ -1759,16 +1776,31 @@ function Specimen() {
         }
       }
       const tri = rec.mat.userData.tri as
-        | { uClose: { value: number }; uScatter: { value: number }; uPulse: { value: number } }
+        | {
+            uClose: { value: number };
+            uScatter: { value: number };
+            uPulse: { value: number };
+            uAniso: { value: number };
+            uDetail: { value: number };
+            uDisplace: { value: number };
+          }
         | undefined;
       if (tri) {
         const scatter0 = (rec.mat.userData.scatter as number) ?? 0;
-        tri.uScatter.value = state.quality === "low" ? 0 : state.quality === "high" ? scatter0 * 1.2 : scatter0;
+        const aniso0 = (rec.mat.userData.aniso as number) ?? 0;
+        tri.uDetail.value = state.quality === "low" ? 0 : 1;
+        tri.uScatter.value = state.quality === "low" ? 0 : state.quality === "high" ? scatter0 : scatter0 * 0.55;
+        tri.uAniso.value = state.quality === "high" ? aniso0 : state.quality === "medium" ? aniso0 * 0.4 : 0;
         tri.uClose.value = close;
+        const mm = frame.unitToMm > 50 ? 0.001 : 1;
+        const breath = Math.sin(performance.now() * 0.0013) * mm * 0.05;
+        const meninge = rec.key === "env:dura" || rec.cat === "meninges_dura" ? 0.42 : rec.key === "env:arachnoid" ? 0.26 : 0;
+        tri.uDisplace.value = state.quality === "low" ? 0 : mm * meninge + (meninge > 0 ? breath : 0);
         const vesselish = rec.cat === "arteries" || rec.cat === "veins_sinuses" || /choroid/i.test(rec.label);
-        const amp = rec.cat === "arteries" ? 1 : /choroid/i.test(rec.label) ? 0.85 : rec.cat === "veins_sinuses" ? 0.6 : 0;
-        const unit = frame.unitToMm > 50 ? 0.00018 : 0.18;
-        tri.uPulse.value = vesselish && state.quality !== "low" ? pulse * amp * unit : 0;
+        const amp = rec.cat === "arteries" ? 1 : /choroid/i.test(rec.label) ? 0.45 : rec.cat === "veins_sinuses" ? 0.55 : 0;
+        const cap = mm * 0.22;
+        const swell = Math.min(rec.radius * 0.016, cap);
+        tri.uPulse.value = vesselish && state.quality !== "low" ? pulse * amp * swell : 0;
       }
 
       const color = state.mode === "parcellation" ? rec.parcel : rec.specimen;
@@ -1782,8 +1814,11 @@ function Specimen() {
         rec.mat.metalness = 0.02;
         rec.mat.envMapIntensity = dull ? 0.16 : rec.cat === "spinal_cord" ? 0.45 : rec.cat === "deep_grey" || rec.cat === "brainstem" ? 0.3 : 0.38;
         if (phys.isMeshPhysicalMaterial) {
-          phys.clearcoat = dull ? 0.02 : coat0 + pulse * 0.05;
+          const film = !dull && state.quality === "high" && rec.cat === "cortex" && phys.iridescence > 0 ? close : 0;
+          phys.clearcoat = dull ? 0.02 : coat0 + pulse * 0.04 + film * 0.2;
+          phys.clearcoatRoughness = dull ? 0.62 : Math.max(0.08, 0.36 - film * 0.22);
           phys.sheen = dull ? 0.02 : rec.cat === "spinal_cord" ? 0.16 : 0.12;
+          if (film > 0) phys.iridescence = 0.012 + film * 0.15;
         }
       }
       if (state.selected === rec.key && rec.cat !== "arteries" && rec.cat !== "veins_sinuses") {
@@ -1823,12 +1858,25 @@ function Specimen() {
       const reach = frame.unitToMm > 50 ? 0.004 : 4;
       for (const rec of frame.records) {
         const phys = rec.mat as THREE.MeshPhysicalMaterial;
-        if ((rec.cat === "cortex" || rec.cat === "cerebellum" || rec.cat === "brainstem") && phys.isMeshPhysicalMaterial) {
-          phys.transmission = high ? 0.1 : 0;
-          phys.thickness = high ? thick : 0;
+        if (
+          (rec.cat === "cortex" || rec.cat === "cerebellum" || rec.cat === "brainstem" || rec.cat === "deep_grey") &&
+          phys.isMeshPhysicalMaterial
+        ) {
+          const amount = rec.cat === "deep_grey" ? 0.07 : 0.1;
+          phys.transmission = high ? amount : 0;
+          phys.thickness = high ? thick * (rec.cat === "deep_grey" ? 0.75 : 1) : 0;
           phys.attenuationDistance = high ? reach : 1e6;
           phys.attenuationColor.set("#ffb090");
           phys.needsUpdate = true;
+        }
+        if (rec.cat === "cortex" && phys.isMeshPhysicalMaterial) {
+          const film = high ? 0.012 : 0;
+          if ((phys.iridescence > 0) !== (film > 0)) {
+            phys.iridescence = film;
+            phys.iridescenceIOR = 1.28;
+            phys.iridescenceThicknessRange = [200, 460];
+            phys.needsUpdate = true;
+          }
         }
         rec.mesh.castShadow = state.quality !== "low" && CAP_CATS.has(rec.cat);
       }
@@ -1890,16 +1938,16 @@ function Specimen() {
       <directionalLight
         ref={keyRef}
         position={[0.2, 2.6, 0.4]}
-        intensity={1.4}
-        color="#d7e6f6"
+        intensity={1.35}
+        color="#e4eef8"
         castShadow
         shadow-mapSize={[512, 512]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
       />
-      <directionalLight ref={fillRef} position={[-1.8, 0.35, 0.2]} intensity={0.62} color="#f6c7a4" />
-      <directionalLight ref={rimRef} position={[0.15, 0.65, -2.1]} intensity={0.5} color="#c5d4ea" />
-      <pointLight ref={transRef} position={[0, -1.2, 0.15]} intensity={0.22} color="#ffb090" distance={0} />
+      <directionalLight ref={fillRef} position={[-1.8, 0.35, 0.2]} intensity={0.7} color="#ffc08a" />
+      <directionalLight ref={rimRef} position={[0.15, 0.65, -2.1]} intensity={0.42} color="#c5d6ea" />
+      <pointLight ref={transRef} position={[0, -1.2, 0.15]} intensity={0.18} color="#ffb090" distance={0} />
       <group ref={rig} />
       <OrbitControls makeDefault enableDamping dampingFactor={0.08} enablePan maxPolarAngle={Math.PI * 0.96} minPolarAngle={0.05} />
       {booted &&
@@ -1946,7 +1994,7 @@ export function Stage() {
           try {
             const pmrem = new THREE.PMREMGenerator(gl);
             scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.18).texture;
-            scene.environmentIntensity = 0.3;
+            scene.environmentIntensity = 0.24;
             pmrem.dispose();
           } catch {
             scene.environmentIntensity = 0.28;

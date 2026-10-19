@@ -359,6 +359,7 @@ uniform float uAlpha;
 uniform float uClose;
 uniform float uAniso;
 uniform float uScatter;
+uniform float uDetail;
 vec3 gSurf;
 vec3 gBlend;
 vec3 gP;
@@ -383,8 +384,10 @@ function compileTriplanar(shader: { vertexShader: string; fragmentShader: string
   shader.uniforms.uClose = { value: 0 };
   shader.uniforms.uAniso = { value: 0 };
   shader.uniforms.uScatter = { value: 0 };
+  shader.uniforms.uDetail = { value: 1 };
   shader.uniforms.uFiber = { value: new THREE.Vector3(0, 1, 0) };
   shader.uniforms.uPulse = { value: 0 };
+  shader.uniforms.uDisplace = { value: 0 };
   shader.vertexShader = shader.vertexShader
     .replace(
       "#include <common>",
@@ -393,12 +396,16 @@ varying vec3 vWPos;
 varying vec3 vWNorm;
 varying vec3 vFiber;
 uniform vec3 uFiber;
-uniform float uPulse;`,
+uniform float uPulse;
+uniform float uDisplace;`,
     )
     .replace(
       "#include <begin_vertex>",
       `#include <begin_vertex>
-transformed += objectNormal * uPulse;`,
+{
+  float ridge = sin(transformed.x * 46.0 + transformed.y * 15.0) * sin(transformed.z * 34.0 + transformed.y * 8.0);
+  transformed += objectNormal * (ridge * uDisplace + uPulse);
+}`,
     )
     .replace(
       "#include <worldpos_vertex>",
@@ -417,28 +424,30 @@ vFiber = mat3(modelMatrix) * uFiber;`,
   gBlend = triBlend(wn);
   gP = vWPos * uScale;
   gSurf = triRgb(tSurf, gP, gBlend);
-  diffuseColor.rgb *= triRgb(tAlb, gP, gBlend);
-  diffuseColor.a *= mix(1.0 - uAlpha, 1.0, gSurf.b);
+  vec3 alb = triRgb(tAlb, gP, gBlend);
+  diffuseColor.rgb *= mix(vec3(1.0), alb, uDetail);
+  diffuseColor.a *= mix(1.0, mix(1.0 - uAlpha, 1.0, gSurf.b), uDetail);
 }`,
     )
     .replace(
       "#include <roughnessmap_fragment>",
       `#include <roughnessmap_fragment>
 {
-  roughnessFactor = clamp(roughnessFactor * (0.55 + gSurf.g), 0.04, 1.0);
+  float mapped = clamp(roughnessFactor * (0.55 + gSurf.g), 0.04, 1.0);
   float align = abs(dot(normalize(vWNorm), normalize(vFiber + vec3(1e-5))));
-  roughnessFactor = clamp(roughnessFactor * mix(1.0, 0.58, align * uAniso), 0.04, 1.0);
+  mapped = clamp(mapped * mix(1.0, 0.62, align * uAniso), 0.04, 1.0);
   if (uClose > 0.04) {
-    float fine = triRgb(tSurf, gP * 3.6, gBlend).g;
-    roughnessFactor = clamp(mix(roughnessFactor, roughnessFactor * (0.68 + fine * 0.6), uClose), 0.04, 1.0);
+    float fine = triRgb(tSurf, gP * 4.2, gBlend).g;
+    mapped = clamp(mix(mapped, mapped * (0.62 + fine * 0.7), uClose), 0.04, 1.0);
   }
+  roughnessFactor = mix(roughnessFactor, mapped, uDetail);
 }`,
     )
     .replace(
       "#include <normal_fragment_maps>",
       `#include <normal_fragment_maps>
 {
-  normal = normalize(normal + vec3(dFdx(gSurf.r), dFdy(gSurf.r), 0.0) * uBump * (1.0 + uClose * 0.65));
+  normal = normalize(normal + vec3(dFdx(gSurf.r), dFdy(gSurf.r), 0.0) * uBump * uDetail * (1.0 + uClose * 0.8));
 }`,
     )
     .replace(
@@ -453,7 +462,7 @@ vFiber = mat3(modelMatrix) * uFiber;`,
       `vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;
 {
   float wrap = pow(clamp(dot(normal, vec3(0.15, 0.95, 0.25)) * 0.55 + 0.45, 0.0, 1.0), 1.5);
-  outgoingLight += vec3(0.62, 0.24, 0.16) * wrap * uScatter * 0.22;
+  outgoingLight += vec3(0.72, 0.28, 0.16) * wrap * uScatter * 0.26;
 }`,
     );
 }
@@ -462,7 +471,7 @@ export function applyTriplanar(mat: THREE.Material, kind: TextureKind) {
   ensureTextures();
   const pack = cache.get(kind);
   if (!pack) return;
-  mat.customProgramCacheKey = () => "neurotome-triplanar-v4";
+  mat.customProgramCacheKey = () => "neurotome-triplanar-v5";
   mat.onBeforeCompile = (shader) => {
     compileTriplanar(shader, pack);
     const fiber = mat.userData.fiber as THREE.Vector3 | undefined;
