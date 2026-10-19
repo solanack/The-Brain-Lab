@@ -13,7 +13,7 @@ import {
   SunMedium,
   X,
 } from "lucide-react";
-import { CATEGORIES, GROUPS, RECIPES, type CatId, type SampleId } from "./data";
+import { CATEGORIES, GROUPS, RECIPES, TOURS, type CatId, type SampleId, type TourId } from "./data";
 import { useLab, type Axis } from "./store";
 
 function Meter({
@@ -88,6 +88,7 @@ export function Chrome() {
   const hr = useLab((s) => s.hr);
   const brief = useLab((s) => s.brief);
   const sheet = useLab((s) => s.sheet);
+  const tour = useLab((s) => s.tour);
   const patch = useLab((s) => s.patch);
 
   useEffect(() => {
@@ -99,7 +100,7 @@ export function Chrome() {
       if (event.key === "m" || event.key === "M") state.patch({ measuring: !state.measuring, measure: [] });
       if (event.key === "s" || event.key === "S") state.patch({ sectionOn: !state.sectionOn });
       if (event.key === "f" || event.key === "F") focusSelection();
-      if (event.key === "Escape") state.patch({ measuring: false, measure: [], selected: null, sheet: null });
+      if (event.key === "Escape") state.patch({ measuring: false, measure: [], selected: null, sheet: null, tour: null });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -167,6 +168,8 @@ export function Chrome() {
         </div>
       )}
 
+      {tour && <TourBar />}
+
       <footer className="pointer-events-auto relative z-30 flex items-center gap-2 overflow-x-auto border-t border-border bg-bg/85 px-2 py-2 backdrop-blur-md">
         <Tools />
         <div className="ml-auto flex gap-2 lg:hidden">
@@ -200,6 +203,48 @@ export function Chrome() {
   );
 }
 
+function TourBar() {
+  const tour = useLab((s) => s.tour);
+  const patch = useLab((s) => s.patch);
+  if (!tour) return null;
+  const spec = TOURS[tour.id];
+  const stop = spec.stops[tour.index];
+  if (!stop) return null;
+  const last = tour.index >= spec.stops.length - 1;
+  return (
+    <div className="pointer-events-auto mx-3 mb-2 rounded-2xl border border-border bg-bg/95 p-3 shadow-lg">
+      <div className="flex items-center gap-2">
+        <p className="font-mono text-xs tracking-widest text-primary">{spec.title.toUpperCase()}</p>
+        <span className="ml-auto font-mono text-xs text-muted tabular-nums">
+          {tour.index + 1}/{spec.stops.length}
+        </span>
+        <button type="button" className="flex size-11 items-center justify-center" aria-label="Close tour" onClick={() => patch({ tour: null })}>
+          <X className="size-4" />
+        </button>
+      </div>
+      <h2 className="text-sm font-semibold">{stop.title}</h2>
+      <p className="mt-1 text-sm text-muted">{stop.note}</p>
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          className="h-11 flex-1 rounded-full bg-surface-2 text-sm disabled:opacity-40"
+          disabled={tour.index === 0}
+          onClick={() => patch({ tour: { id: tour.id, index: tour.index - 1 } })}
+        >
+          Back
+        </button>
+        <button
+          type="button"
+          className="h-11 flex-1 rounded-full bg-primary text-sm text-primary-fg"
+          onClick={() => patch(last ? { tour: null } : { tour: { id: tour.id, index: tour.index + 1 } })}
+        >
+          {last ? "Done" : "Next"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function focusSelection() {
   const state = useLab.getState();
   const key = state.selected;
@@ -225,6 +270,66 @@ function openSample(id: SampleId) {
   }
   state.patch({ sample: id, tissue: true, opacity, mag: id === "hip" ? 1.7 : 2.8, retract: 0.2, sheet: "dossier" });
   state.request({ type: "sample" });
+}
+
+function beginTour(id: TourId) {
+  const state = useLab.getState();
+  const hidden = { ...state.hidden };
+  const visible = { ...state.visible };
+  const opacity = { ...state.opacity };
+  if (id === "visual") {
+    for (const item of state.directory) {
+      if (item.cat === "cranial_nerves") hidden[item.key] = !/optic|chiasm/i.test(item.label);
+      if (item.cat === "tracts") hidden[item.key] = !/optic radiation/i.test(item.label);
+      if (item.cat === "globe" || item.cat === "orbit") hidden[item.key] = false;
+    }
+    Object.assign(opacity, {
+      cortex: 0.14,
+      white_matter: 0.08,
+      cerebellum: 0.06,
+      brainstem: 0.4,
+      diencephalon: 0.28,
+      globe: 1,
+      orbit: 1,
+      cranial_nerves: 1,
+      tracts: 0.85,
+      dura: 0.04,
+      arachnoid: 0.04,
+    });
+    visible.globe = true;
+    visible.orbit = true;
+    visible.cranial_nerves = true;
+    visible.tracts = true;
+  } else {
+    for (const item of state.directory) {
+      if (item.cat === "tracts") hidden[item.key] = !/corticospinal/i.test(item.label);
+      if (item.cat === "cranial_nerves") hidden[item.key] = true;
+    }
+    Object.assign(opacity, {
+      cortex: 0.16,
+      white_matter: 0.12,
+      cerebellum: 0.08,
+      brainstem: 0.72,
+      spinal_cord: 1,
+      tracts: 1,
+      dura: 0.04,
+      arachnoid: 0.04,
+    });
+    visible.tracts = true;
+    visible.spinal_cord = true;
+    visible.brainstem = true;
+    visible.cortex = true;
+  }
+  state.patch({
+    hidden,
+    visible,
+    opacity,
+    tour: { id, index: 0 },
+    explode: id === "visual" ? 0.2 : 0.12,
+    isolated: null,
+    sectionOn: false,
+    sheet: null,
+  });
 }
 
 function applyOpacity(partial: Partial<Record<CatId, number>>, extra?: { visible?: Record<CatId, boolean> }) {
@@ -372,40 +477,8 @@ function Layers() {
         >
           Nerves
         </Pill>
-        <Pill
-          onClick={() => {
-            const state = useLab.getState();
-            const hidden = { ...state.hidden };
-            for (const item of state.directory) {
-              if (item.cat === "cranial_nerves") hidden[item.key] = !/optic/i.test(item.label);
-              if (item.cat === "tracts") hidden[item.key] = !/optic radiation/i.test(item.label);
-              if (item.cat === "globe" || item.cat === "orbit") hidden[item.key] = false;
-            }
-            state.patch({
-              hidden,
-              explode: 0.22,
-              isolated: null,
-              sectionOn: false,
-              opacity: {
-                ...state.opacity,
-                cortex: 0.14,
-                white_matter: 0.08,
-                cerebellum: 0.06,
-                brainstem: 0.4,
-                diencephalon: 0.28,
-                globe: 1,
-                orbit: 1,
-                cranial_nerves: 1,
-                tracts: 0.85,
-                dura: 0.04,
-                arachnoid: 0.04,
-              },
-              visible: { ...state.visible, globe: true, orbit: true, cranial_nerves: true, tracts: true },
-            });
-          }}
-        >
-          Visual pathway
-        </Pill>
+        <Pill onClick={() => beginTour("visual")}>Visual pathway</Pill>
+        <Pill onClick={() => beginTour("corticospinal")}>Corticospinal</Pill>
         <Pill
           onClick={() =>
             useLab.getState().patch({

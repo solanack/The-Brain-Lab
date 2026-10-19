@@ -5,11 +5,13 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import {
   CAT_BY_ID,
   CAT_IDS,
   RECIPES,
   RECIPE_BY_ID,
+  TOURS,
   pearlFor,
   type CatId,
   type Recipe,
@@ -770,6 +772,32 @@ function MeasureReadout({ unitToMm }: { unitToMm: number }) {
   );
 }
 
+function pointAlong(rec: Rec, superior: THREE.Vector3, t: number) {
+  const pos = rec.mesh.geometry.getAttribute("position");
+  const v = new THREE.Vector3();
+  const step = Math.max(1, Math.floor(pos.count / 500));
+  let minS = Infinity;
+  let maxS = -Infinity;
+  for (let i = 0; i < pos.count; i += step) {
+    v.fromBufferAttribute(pos as THREE.BufferAttribute, i);
+    const s = v.dot(superior);
+    if (s < minS) minS = s;
+    if (s > maxS) maxS = s;
+  }
+  const target = THREE.MathUtils.lerp(minS, maxS, t);
+  const best = new THREE.Vector3();
+  let bestD = Infinity;
+  for (let i = 0; i < pos.count; i += step) {
+    v.fromBufferAttribute(pos as THREE.BufferAttribute, i);
+    const d = Math.abs(v.dot(superior) - target);
+    if (d < bestD) {
+      bestD = d;
+      best.copy(v);
+    }
+  }
+  return best;
+}
+
 function visualTarget(rec: Rec, frame: Frame, explode: number, retract: number, excised: string[], out: THREE.Vector3) {
   if (excised.includes(rec.key)) {
     const index = excised.indexOf(rec.key);
@@ -884,6 +912,25 @@ function tubeBetween(a: THREE.Vector3, b: THREE.Vector3, r0: number, r1: number,
   return geo;
 }
 
+function leadingPoint(mesh: THREE.Mesh, anterior: THREE.Vector3) {
+  const pos = mesh.geometry.getAttribute("position");
+  const v = new THREE.Vector3();
+  const tip = new THREE.Vector3();
+  mesh.updateWorldMatrix(true, false);
+  let maxA = -Infinity;
+  const step = Math.max(1, Math.floor(pos.count / 700));
+  for (let i = 0; i < pos.count; i += step) {
+    v.fromBufferAttribute(pos as THREE.BufferAttribute, i);
+    mesh.localToWorld(v);
+    const a = v.dot(anterior);
+    if (a > maxA) {
+      maxA = a;
+      tip.copy(v);
+    }
+  }
+  return tip;
+}
+
 function addOrbitContents(
   records: Rec[],
   directory: Meta[],
@@ -897,6 +944,7 @@ function addOrbitContents(
   const nerves = records.filter((r) => /optic nerve/i.test(r.label));
   const chiasm = records.find((r) => /chiasm/i.test(r.label));
   const chiasmA = chiasm ? chiasm.restCenter.dot(anterior) : null;
+  const touches: { side: Side; name: string; at: THREE.Vector3 }[] = [];
   const v = new THREE.Vector3();
   for (const side of ["left", "right"] as const) {
     const nerve = nerves.find((r) => r.side === side) ?? nerves.find((r) => r.side === "median");
@@ -944,7 +992,8 @@ function addOrbitContents(
       vert.negate();
       lat.negate();
     }
-    const pole = center.clone().addScaledVector(forward, -globeR * 0.97);
+    const discDir = forward.clone().negate().addScaledVector(lat, -0.2).addScaledVector(vert, 0.06).normalize();
+    const discAt = center.clone().addScaledVector(discDir, globeR * 1.004);
     const push = (
       geo: THREE.BufferGeometry,
       mat: THREE.MeshStandardMaterial,
@@ -952,6 +1001,7 @@ function addOrbitContents(
       label: string,
       cat: CatId,
       color?: string,
+      sideAs?: Side,
     ) => {
       if (color) mat.color.set(color);
       const mesh = new THREE.Mesh(geo, mat);
@@ -959,16 +1009,17 @@ function addOrbitContents(
       parent.add(mesh);
       const specimen = mat.color.clone();
       const restCenter = meshCenter(mesh);
-      const outward = side === "left" ? rightAxis.clone().negate() : rightAxis.clone();
+      const placedSide = sideAs ?? side;
+      const outward = placedSide === "left" ? rightAxis.clone().negate() : placedSide === "right" ? rightAxis.clone() : anterior.clone();
       records.push({
         key,
         mesh,
         mat,
         cat,
-        side,
+        side: placedSide,
         label,
         region: "Orbit",
-        hay: `${label} orbit globe optic nerve rectus ${side}`.toLowerCase(),
+        hay: `${label} orbit globe optic nerve rectus ${placedSide}`.toLowerCase(),
         restCenter,
         restPosition: mesh.position.clone(),
         dir: outward,
@@ -976,13 +1027,13 @@ function addOrbitContents(
         weight: CAT_BY_ID[cat].explode,
         glassy: false,
         specimen,
-        parcel: color ? specimen.clone() : parcelColor(cat, label.length + (side === "left" ? 1 : 2)),
+        parcel: color ? specimen.clone() : parcelColor(cat, label.length + (placedSide === "left" ? 1 : 2)),
         placed: false,
       });
       directory.push({
         key,
         label,
-        side,
+        side: placedSide,
         region: "Orbit",
         cat,
         ta2: "Orbit",
@@ -1000,7 +1051,26 @@ function addOrbitContents(
     choroidGeo.translate(center.x, center.y, center.z);
     push(scleraGeo, sclera, `orbit:globe:${side}`, "Globe", "globe");
     push(choroidGeo, choroid, `orbit:choroid:${side}`, "Choroid", "globe", "#6e3a36");
-    push(tubeBetween(tip, pole, mm(1.8), mm(1.5)), nerveMat, `orbit:nerve:${side}`, "Optic nerve (II), intraorbital", "globe", "#e4d4ae");
+    const cornea = makeMaterial("globe", new THREE.Color("#c5d5de"), side === "left" ? 37 : 38);
+    const corneaPhys = cornea as THREE.MeshPhysicalMaterial;
+    corneaPhys.transmission = 0.42;
+    corneaPhys.thickness = mm(0.6);
+    corneaPhys.roughness = 0.08;
+    corneaPhys.clearcoat = 0.4;
+    corneaPhys.clearcoatRoughness = 0.18;
+    corneaPhys.ior = 1.376;
+    cornea.color.set("#c5d5de");
+    const corneaGeo = new THREE.SphereGeometry(mm(7.6), 20, 14);
+    corneaGeo.translate(center.x + forward.x * (globeR - mm(5.2)), center.y + forward.y * (globeR - mm(5.2)), center.z + forward.z * (globeR - mm(5.2)));
+    push(corneaGeo, cornea, `orbit:cornea:${side}`, "Cornea", "globe", "#c5d5de");
+    const discGeo = new THREE.CircleGeometry(mm(1.45), 18);
+    discGeo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), discDir));
+    discGeo.translate(discAt.x, discAt.y, discAt.z);
+    const discMat = makeMaterial("globe", new THREE.Color("#e4b89a"), side === "left" ? 39 : 40);
+    discMat.roughness = 0.62;
+    (discMat as THREE.MeshPhysicalMaterial).transmission = 0;
+    push(discGeo, discMat, `orbit:disc:${side}`, "Optic disc", "globe", "#e4b89a");
+    push(tubeBetween(tip, discAt, mm(1.8), mm(1.35)), nerveMat, `orbit:nerve:${side}`, "Optic nerve (II), intraorbital", "globe", "#e4d4ae");
     const recti: [string, THREE.Vector3][] = [
       ["Superior rectus", vert],
       ["Inferior rectus", vert.clone().negate()],
@@ -1010,8 +1080,13 @@ function addOrbitContents(
     recti.forEach(([label, axis], index) => {
       const origin = tip.clone().addScaledVector(axis, mm(3.2)).addScaledVector(forward, mm(2));
       const insert = axis.clone().multiplyScalar(0.78).addScaledVector(forward, 0.18).normalize().multiplyScalar(globeR).add(center);
+      const belly = origin.clone().lerp(insert, 0.76);
       const mat = makeMaterial("orbit", new THREE.Color("#8f4e44"), 40 + index + (side === "left" ? 0 : 8));
-      push(tubeBetween(origin, insert, mm(2.3), mm(1.15)), mat, `orbit:rectus:${side}:${index}`, label, "orbit");
+      const tendon = makeMaterial("orbit", new THREE.Color("#c9a090"), 48 + index + (side === "left" ? 0 : 8));
+      tendon.roughness = 0.7;
+      push(tubeBetween(origin, belly, mm(2.2), mm(1.25)), mat, `orbit:rectus:${side}:${index}`, label, "orbit");
+      push(tubeBetween(belly, insert, mm(1.05), mm(0.38), 6), tendon, `orbit:tendon:${side}:${index}`, `${label} tendon`, "orbit", "#c9a090");
+      touches.push({ side, name: label, at: origin.clone().lerp(insert, 0.28) });
     });
     const trochlea = center.clone().addScaledVector(forward, mm(8)).addScaledVector(lat, -mm(11)).addScaledVector(vert, mm(10));
     const soInsert = vert.clone().multiplyScalar(0.55).addScaledVector(lat, 0.35).addScaledVector(forward, -0.25).normalize().multiplyScalar(globeR).add(center);
@@ -1019,6 +1094,8 @@ function addOrbitContents(
     const ioInsert = lat.clone().multiplyScalar(0.62).addScaledVector(vert, -0.4).addScaledVector(forward, -0.28).normalize().multiplyScalar(globeR).add(center);
     push(tubeBetween(trochlea, soInsert, mm(1.05), mm(0.85), 6), makeMaterial("orbit", new THREE.Color("#8f4e44"), 60), `orbit:so:${side}`, "Superior oblique", "orbit");
     push(tubeBetween(ioOrigin, ioInsert, mm(1.15), mm(0.9), 6), makeMaterial("orbit", new THREE.Color("#8f4e44"), 61), `orbit:io:${side}`, "Inferior oblique", "orbit");
+    touches.push({ side, name: "Superior oblique", at: trochlea.clone().lerp(soInsert, 0.45) });
+    touches.push({ side, name: "Inferior oblique", at: ioOrigin.clone().lerp(ioInsert, 0.4) });
     for (let i = 0; i < 5; i++) {
       const along = 0.22 + i * 0.14;
       const spin = (i / 5) * Math.PI * 2 + (side === "left" ? 0.4 : 0);
@@ -1030,6 +1107,42 @@ function addOrbitContents(
       mat.roughness = 0.86;
       (mat as THREE.MeshPhysicalMaterial).clearcoat = 0.02;
       push(fat, mat, `orbit:fat:${side}:${i}`, "Orbital fat", "orbit", "#d8c4a6");
+    }
+    const supply: [string, string, string[]][] = [
+      ["Oculomotor nerve (III)", "Oculomotor filaments (III)", ["Superior rectus", "Inferior rectus", "Medial rectus", "Inferior oblique"]],
+      ["Trochlear nerve (IV)", "Trochlear filaments (IV)", ["Superior oblique"]],
+      ["Abducens nerve (VI)", "Abducens filaments (VI)", ["Lateral rectus"]],
+    ];
+    for (const [nerveLabel, filamentLabel, names] of supply) {
+      const nerveRec = records.find((item) => item.label === nerveLabel && item.side === side);
+      if (!nerveRec) continue;
+      const from = leadingPoint(nerveRec.mesh, anterior);
+      const geos = names
+        .map((name) => touches.find((item) => item.side === side && item.name === name))
+        .filter((item): item is { side: Side; name: string; at: THREE.Vector3 } => Boolean(item))
+        .map((item) => tubeBetween(from, item.at, mm(0.35), mm(0.28), 5));
+      if (!geos.length) continue;
+      const geo = geos.length === 1 ? geos[0]! : mergeGeometries(geos, false);
+      if (!geo) continue;
+      if (geos.length > 1) geos.forEach((item) => item.dispose());
+      const mat = makeMaterial("cranial_nerves", new THREE.Color("#e4d4ae"), filamentLabel.length + (side === "left" ? 3 : 9));
+      push(geo, mat, `orbit:inn:${side}:${nerveLabel}`, filamentLabel, "cranial_nerves", "#e4d4ae");
+    }
+    if (side === "left" && chiasm) {
+      const mid = chiasm.restCenter;
+      const half = mm(7);
+      const leftIn = mid.clone().addScaledVector(rightAxis, -half).addScaledVector(anterior, mm(2)).addScaledVector(superior, mm(0.35));
+      const rightIn = mid.clone().addScaledVector(rightAxis, half).addScaledVector(anterior, mm(2)).addScaledVector(superior, -mm(0.35));
+      const leftOut = mid.clone().addScaledVector(rightAxis, -half).addScaledVector(anterior, -mm(3.2)).addScaledVector(superior, -mm(0.25));
+      const rightOut = mid.clone().addScaledVector(rightAxis, half).addScaledVector(anterior, -mm(3.2)).addScaledVector(superior, mm(0.25));
+      const cross = mergeGeometries(
+        [tubeBetween(leftIn, rightOut, mm(0.42), mm(0.42), 5), tubeBetween(rightIn, leftOut, mm(0.42), mm(0.42), 5)],
+        false,
+      );
+      if (cross) {
+        const mat = makeMaterial("cranial_nerves", new THREE.Color("#f0d8b0"), 91);
+        push(cross, mat, "orbit:decussation", "Chiasmatic decussation", "cranial_nerves", "#f0d8b0", "median");
+      }
     }
   }
 }
@@ -1304,6 +1417,7 @@ function Specimen() {
   const [unit, setUnit] = useState(1000);
   const fly = useRef<{ cam: THREE.Vector3; target: THREE.Vector3 } | null>(null);
   const nonce = useRef(-1);
+  const tourRef = useRef("");
   const opticsTick = useRef(0);
   const modeRef = useRef<"specimen" | "parcellation">("specimen");
   const keyRef = useRef<THREE.DirectionalLight>(null);
@@ -1880,6 +1994,28 @@ function Specimen() {
             cam: focus.clone().addScaledVector(tangent, dist).addScaledVector(anchor.normal, dist * 0.38),
             target: focus,
           };
+        }
+      }
+    }
+    const tourKey = state.tour ? `${state.tour.id}:${state.tour.index}` : "";
+    if (tourKey !== tourRef.current) {
+      tourRef.current = tourKey;
+      if (state.tour) {
+        const stop = TOURS[state.tour.id].stops[state.tour.index];
+        const want = stop?.label.toLowerCase();
+        const rec = want
+          ? frame.records.find((item) => item.label.toLowerCase() === want && (!stop.side || item.side === stop.side)) ??
+            frame.records.find((item) => item.label.toLowerCase().includes(want) && (!stop.side || item.side === stop.side || item.side === "median"))
+          : undefined;
+        if (rec && stop) {
+          useLab.getState().patch({ selected: rec.key });
+          const focus = stop.at == null ? rec.restCenter.clone() : pointAlong(rec, frame.superior, stop.at);
+          visualTarget(rec, frame, state.explode, state.retract, state.excised, _desired);
+          focus.add(_desired).sub(rec.restCenter);
+          const dist = THREE.MathUtils.clamp(stop.at == null ? Math.max(rec.radius * 4.2, frame.maxDim * 0.34) : frame.maxDim * 0.3, frame.maxDim * 0.18, frame.maxDim * 0.62);
+          const lateral = stop.side === "left" ? -0.42 : stop.side === "right" ? 0.42 : 0.28;
+          _view.copy(frame.anterior).multiplyScalar(0.8).addScaledVector(frame.right, lateral).addScaledVector(frame.superior, 0.22).normalize();
+          fly.current = { cam: focus.clone().addScaledVector(_view, dist), target: focus };
         }
       }
     }

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { CAT_IDS, CATEGORIES, type CatId, type SampleId } from "./data";
+import { CAT_IDS, CATEGORIES, type CatId, type SampleId, type TourId } from "./data";
 
 export type Meta = {
   key: string;
@@ -64,6 +64,7 @@ export type LabState = {
   turntable: boolean;
   intent: Intent;
   intentNonce: number;
+  tour: { id: TourId; index: number } | null;
   optics: Optics;
   brief: boolean;
   sheet: "layers" | "dossier" | "field" | null;
@@ -119,6 +120,7 @@ export const useLab = create<LabState>((set, get) => ({
   turntable: false,
   intent: null,
   intentNonce: 0,
+  tour: null,
   optics: { distanceMm: 0, approach: "—", count: 0, unitToMm: 1000 },
   brief: true,
   sheet: null,
@@ -153,6 +155,7 @@ export const useLab = create<LabState>((set, get) => ({
       opacity: { ...opacity0 },
       intent: { type: "home" },
       intentNonce: get().intentNonce + 1,
+      tour: null,
     }),
   setOptics: (optics) => {
     const prev = get().optics;
