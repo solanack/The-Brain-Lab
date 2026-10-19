@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import {
@@ -16,6 +17,7 @@ import {
   type Stratum,
 } from "./data";
 import { useLab, type Axis, type Meta } from "./store";
+import { applyRepeating, applySpinalUv, applyTriplanar, tissueTextures } from "./textures";
 
 type Side = "left" | "right" | "median";
 
@@ -149,6 +151,7 @@ function parcelColor(cat: CatId, index: number) {
     diencephalon: [0.02, 0.07],
     ventricles: [0.45, 0.53],
     brainstem: [0.03, 0.09],
+    spinal_cord: [0.08, 0.12],
     cerebellum: [0.015, 0.06],
     arteries: [0.99, 1.02],
     veins_sinuses: [0.58, 0.67],
@@ -162,44 +165,86 @@ function parcelColor(cat: CatId, index: number) {
   return new THREE.Color().setHSL(h % 1, sat, light);
 }
 
-function makeMaterial(cat: CatId, specimen: THREE.Color) {
+function hashUnit(n: number) {
+  const x = Math.sin(n * 127.1) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
   const meta = CAT_BY_ID[cat];
   const glassy = cat === "dura" || cat === "arachnoid" || cat === "ventricles";
   const sheet = cat === "dura" || cat === "arachnoid" || cat === "meninges_dura" || cat === "ventricles";
-  const wet = cat === "cortex" || cat === "cerebellum" || cat === "brainstem" || cat === "deep_grey" || cat === "diencephalon";
+  const wet =
+    cat === "cortex" ||
+    cat === "cerebellum" ||
+    cat === "brainstem" ||
+    cat === "spinal_cord" ||
+    cat === "deep_grey" ||
+    cat === "diencephalon";
+  const flesh = cat === "cortex" || cat === "cerebellum" || cat === "deep_grey" || cat === "brainstem";
   const vessel = cat === "arteries" || cat === "veins_sinuses";
-
-  const mat = new THREE.MeshStandardMaterial({
+  const physical = wet || vessel || cat === "ventricles";
+  const roughJitter = (hashUnit(seed) - 0.5) * 0.08;
+  if (flesh) specimen.offsetHSL((hashUnit(seed + 3) - 0.5) * 0.02, (hashUnit(seed + 9) - 0.5) * 0.05, 0);
+  const roughness = flesh
+    ? THREE.MathUtils.clamp(0.46 + roughJitter, 0.4, 0.55)
+    : vessel
+      ? 0.28
+      : wet
+        ? THREE.MathUtils.clamp(0.42 + roughJitter * 0.4, 0.36, 0.52)
+        : meta.rough;
+  const mat = new (physical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial)({
     color: specimen,
-    roughness: wet ? Math.min(meta.rough, 0.28) : vessel ? 0.22 : meta.rough,
-    metalness: vessel ? 0.12 : wet ? 0.02 : 0.04,
-    envMapIntensity: vessel ? 1.1 : wet ? 0.85 : 0.55,
+    roughness,
+    metalness: vessel ? 0.12 : 0.02,
+    envMapIntensity: vessel ? 0.7 : cat === "cortex" || cat === "cerebellum" ? 0.38 : wet ? 0.32 : 0.4,
     side: sheet ? THREE.DoubleSide : THREE.FrontSide,
     transparent: glassy || meta.transparent,
     opacity: meta.opacity,
     depthWrite: !glassy && meta.opacity > 0.6,
-    clearcoat: wet || vessel ? 0.35 : 0,
-    clearcoatRoughness: wet ? 0.25 : 0.4,
-    sheen: wet ? 0.4 : 0,
-    sheenRoughness: 0.4,
-    sheenColor: specimen.clone().multiplyScalar(0.6),
   });
-
+  if (physical) {
+    const phys = mat as THREE.MeshPhysicalMaterial;
+    phys.clearcoat = wet || vessel ? 0.16 : 0;
+    phys.clearcoatRoughness = wet ? 0.42 : 0.5;
+    phys.sheen = wet ? 0.12 : 0;
+    phys.sheenRoughness = 0.55;
+    phys.sheenColor.set("#a87468");
+    if (vessel) {
+      phys.emissive.copy(specimen).multiplyScalar(0.12);
+      phys.emissiveIntensity = cat === "arteries" ? 0.08 : 0.05;
+    }
+    if (flesh) {
+      phys.emissive.set("#3d1816");
+      phys.emissiveIntensity = 0.025;
+    }
+    if (cat === "ventricles") {
+      phys.transmission = 0.72;
+      phys.thickness = 0.08;
+      phys.ior = 1.33;
+      phys.roughness = 0.06;
+      phys.attenuationDistance = 0.12;
+      phys.attenuationColor = new THREE.Color("#d5ece8");
+    }
+    if (cat === "spinal_cord") {
+      phys.roughness = 0.36;
+      phys.clearcoat = 0.24;
+      phys.clearcoatRoughness = 0.32;
+      phys.sheen = 0.16;
+      phys.sheenColor.set("#f0e2d6");
+      phys.envMapIntensity = 0.45;
+      mat.roughness = 0.36;
+    }
+  }
+  mat.userData.rough0 = mat.roughness;
+  mat.userData.coat0 = (mat as THREE.MeshPhysicalMaterial).clearcoat ?? 0;
   if (vessel) {
-    mat.emissive = specimen.clone().multiplyScalar(0.08);
-    mat.emissiveIntensity = 0.25;
     mat.polygonOffset = true;
     mat.polygonOffsetFactor = -2;
     mat.polygonOffsetUnits = -2;
   }
-
-  if (cat === "ventricles") {
-    mat.transmission = 0.65;
-    mat.thickness = 0.4;
-    mat.ior = 1.33;
-    mat.roughness = 0.08;
-  }
-
+  if (cat === "spinal_cord") applySpinalUv(mat);
+  else applyTriplanar(mat, cat);
   return mat;
 }
 
@@ -422,6 +467,7 @@ function buildTissue(recipe: Recipe) {
   const rnd = mulberry32(recipe.id === "m1" ? 11 : recipe.id === "v1" ? 29 : recipe.id === "cb" ? 47 : 71);
   const layers: THREE.Group[] = [];
   const axonMat = new THREE.MeshStandardMaterial({ color: "#f4efe6", roughness: 0.45, metalness: 0.02 });
+  applyRepeating(axonMat, "white_matter", 0.00005, 3);
   const capMat = new THREE.MeshStandardMaterial({
     color: "#a33b3e",
     roughness: 0.35,
@@ -429,12 +475,14 @@ function buildTissue(recipe: Recipe) {
     emissive: "#5a1618",
     emissiveIntensity: 0.35,
   });
+  applyRepeating(capMat, "arteries", 0.00004, 4);
   const veinMat = new THREE.MeshStandardMaterial({
     color: "#5c4d78",
     roughness: 0.4,
     emissive: "#24182e",
     emissiveIntensity: 0.2,
   });
+  applyRepeating(veinMat, "veins_sinuses", 0.00004, 3);
 
   recipe.strata.forEach((stratum, index) => {
     const layer = new THREE.Group();
@@ -442,23 +490,26 @@ function buildTissue(recipe: Recipe) {
     layer.userData.stratum = stratum.name;
     const height = Math.max(0.0004, (stratum.to - stratum.from) * H);
     const mid = ((stratum.from + stratum.to) / 2) * H;
-    const slab = new THREE.Mesh(
-      new THREE.BoxGeometry(W, height, D),
-      new THREE.MeshStandardMaterial({
-        color: stratum.tint,
-        transparent: true,
-        opacity: 0.12,
-        depthWrite: false,
-        roughness: 0.6,
-      }),
-    );
+    const slabMat = new THREE.MeshStandardMaterial({
+      color: stratum.tint,
+      transparent: true,
+      opacity: 0.12,
+      depthWrite: false,
+      roughness: 0.6,
+    });
+    applyRepeating(slabMat, "ecm", 0.00025, 2);
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(W, height, D), slabMat);
     slab.position.y = mid;
     slab.renderOrder = 1;
     layer.add(slab);
 
     if (stratum.cells !== "none" && stratum.count > 0) {
-      const soma = new THREE.InstancedMesh(UNIT.soma, new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.45 }), stratum.count);
-      const cones = new THREE.InstancedMesh(UNIT.cone, new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.55 }), stratum.count);
+      const somaMat = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.45 });
+      const coneMat = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.55 });
+      applyRepeating(somaMat, "cell", 0.00012, 2);
+      applyRepeating(coneMat, "cell", 0.00008, 2);
+      const soma = new THREE.InstancedMesh(UNIT.soma, somaMat, stratum.count);
+      const cones = new THREE.InstancedMesh(UNIT.cone, coneMat, stratum.count);
       const dummy = new THREE.Object3D();
       const somaColor = new THREE.Color(
         stratum.cells === "granule" ? "#d7c094" : stratum.cells === "glia" ? "#ddd0c2" : stratum.cells === "purkinje" ? "#a86a5c" : "#c48b80",
@@ -519,16 +570,15 @@ function buildTissue(recipe: Recipe) {
     layers.push(layer);
   });
 
-  const ecm = new THREE.Mesh(
-    new THREE.BoxGeometry(W * 1.02, H, D * 1.02),
-    new THREE.MeshStandardMaterial({
-      color: "#f6f1ea",
-      transparent: true,
-      opacity: 0.05,
-      depthWrite: false,
-      roughness: 0.9,
-    }),
-  );
+  const ecmMat = new THREE.MeshStandardMaterial({
+    color: "#f6f1ea",
+    transparent: true,
+    opacity: 0.05,
+    depthWrite: false,
+    roughness: 0.9,
+  });
+  applyRepeating(ecmMat, "ecm", 0.0002, 3);
+  const ecm = new THREE.Mesh(new THREE.BoxGeometry(W * 1.02, H, D * 1.02), ecmMat);
   ecm.position.y = H / 2;
   ecm.renderOrder = 0;
   root.add(ecm);
@@ -685,12 +735,10 @@ function visualTarget(rec: Rec, frame: Frame, explode: number, retract: number, 
       frame.tray.z + row * frame.maxDim * 0.26,
     );
   }
-
   const e = explode;
   const md = frame.maxDim;
   out.copy(rec.restCenter);
 
-  // Category-specific anatomical displacement for a realistic layered explode
   switch (rec.cat) {
     case "dura":
     case "meninges_dura":
@@ -710,7 +758,6 @@ function visualTarget(rec: Rec, frame: Frame, explode: number, retract: number, 
       out.addScaledVector(frame.superior, e * md * 0.18);
       if (rec.side === "left") out.addScaledVector(frame.right, -e * md * 0.32);
       if (rec.side === "right") out.addScaledVector(frame.right, e * md * 0.32);
-      // Subtle anterior/posterior peel for gyri
       out.addScaledVector(frame.anterior, e * md * 0.06 * (rec.restCenter.dot(frame.anterior) > 0 ? 1 : -0.4));
       break;
     case "white_matter":
@@ -735,8 +782,12 @@ function visualTarget(rec: Rec, frame: Frame, explode: number, retract: number, 
       break;
     case "brainstem":
       out.addScaledVector(rec.dir, e * rec.weight * md * 0.28);
-      out.addScaledVector(frame.superior, -e * md * 0.12); // inferior drift
+      out.addScaledVector(frame.superior, -e * md * 0.12);
       out.addScaledVector(frame.anterior, -e * md * 0.08);
+      break;
+    case "spinal_cord":
+      out.addScaledVector(frame.superior, -e * md * 0.42);
+      out.addScaledVector(frame.anterior, -e * md * 0.06);
       break;
     case "cerebellum":
       out.addScaledVector(rec.dir, e * rec.weight * md * 0.42);
@@ -757,12 +808,193 @@ function visualTarget(rec: Rec, frame: Frame, explode: number, retract: number, 
       out.addScaledVector(rec.dir, e * rec.weight * md * 0.3);
   }
 
-  // Fine per-structure jitter for organic detail (deterministic from key)
-  const jitter = (parseInt(rec.key.slice(-4), 16) % 100) / 100 - 0.5;
+  const parsed = Number.parseInt(rec.key.slice(-4), 16);
+  const jitter = (Number.isFinite(parsed) ? parsed % 100 : rec.key.length * 17) / 100 - 0.5;
   out.addScaledVector(rec.dir, e * md * 0.015 * jitter);
   out.addScaledVector(frame.right, e * md * 0.01 * jitter);
 
   return out;
+}
+
+function smoothstep01(e0: number, e1: number, x: number) {
+  const t = THREE.MathUtils.clamp((x - e0) / (e1 - e0), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function buildSpinalCord(
+  origin: THREE.Vector3,
+  inferior: THREE.Vector3,
+  anterior: THREE.Vector3,
+  right: THREE.Vector3,
+  unitToMm: number,
+  startMm: number,
+) {
+  const mm = (n: number) => n / unitToMm;
+  const length = mm(420);
+  const rings = 96;
+  const segs = 48;
+  const centerAt = (t: number) => {
+    const sag = Math.sin(t * Math.PI) * mm(t < 0.42 ? 12 : -8);
+    const lat = Math.sin(t * Math.PI * 2) * mm(2.2);
+    return origin
+      .clone()
+      .addScaledVector(inferior, t * length)
+      .addScaledVector(anterior, sag)
+      .addScaledVector(right, lat);
+  };
+  const frameAt = (t: number) => {
+    const p = centerAt(t);
+    const tangent = centerAt(Math.min(1, t + 0.008)).sub(p);
+    if (tangent.lengthSq() < 1e-12) tangent.copy(inferior);
+    tangent.normalize();
+    const r = right.clone().addScaledVector(tangent, -right.dot(tangent));
+    if (r.lengthSq() < 1e-10) r.copy(right);
+    r.normalize();
+    const a = new THREE.Vector3().crossVectors(r, tangent);
+    if (a.dot(anterior) < 0) {
+      a.negate();
+      r.negate();
+    }
+    a.normalize();
+    return { p, tangent, right: r, anterior: a };
+  };
+  const radii = (t: number) => {
+    const cerv = Math.exp(-(((t - 0.13) / 0.1) ** 2));
+    const lumb = Math.exp(-(((t - 0.74) / 0.065) ** 2));
+    const conus = smoothstep01(0.82, 1, t);
+    let trans = 4.7 + cerv * 1.9 + lumb * 1.45;
+    let ap = trans * 0.76;
+    const taper = 1 - conus * 0.9;
+    trans *= taper;
+    ap *= taper;
+    const join = smoothstep01(0, 0.05, t);
+    return {
+      trans: mm(THREE.MathUtils.lerp(startMm, trans, join)),
+      ap: mm(THREE.MathUtils.lerp(startMm * 0.84, ap, join)),
+    };
+  };
+  const groove = (ang: number) => {
+    const fromAnt = Math.min(ang, Math.PI * 2 - ang);
+    const fissure = Math.exp(-((fromAnt / 0.2) ** 2));
+    const fromPost = Math.abs(ang - Math.PI);
+    const sulcus = Math.exp(-((fromPost / 0.18) ** 2));
+    const dent = Math.exp(-((Math.abs(fromPost - 0.7) / 0.12) ** 2));
+    return 1 - fissure * 0.3 - sulcus * 0.11 - dent * 0.045;
+  };
+
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  for (let i = 0; i <= rings; i++) {
+    const t = i / rings;
+    const fr = frameAt(t);
+    const rad = radii(t);
+    for (let j = 0; j <= segs; j++) {
+      const ang = (j / segs) * Math.PI * 2;
+      const g = groove(ang);
+      const p = fr.p
+        .clone()
+        .addScaledVector(fr.right, Math.sin(ang) * rad.trans * g)
+        .addScaledVector(fr.anterior, Math.cos(ang) * rad.ap * g);
+      positions.push(p.x, p.y, p.z);
+      uvs.push(j / segs, 1 - t);
+    }
+  }
+  const row = segs + 1;
+  for (let i = 0; i < rings; i++) {
+    for (let j = 0; j < segs; j++) {
+      const a = i * row + j;
+      const b = a + row;
+      indices.push(a, a + 1, b, a + 1, b + 1, b);
+    }
+  }
+  const cordGeo = new THREE.BufferGeometry();
+  cordGeo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  cordGeo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  cordGeo.setIndex(indices);
+  cordGeo.computeVertexNormals();
+
+  const rp: number[] = [];
+  const ri: number[] = [];
+  const addStrand = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, radius: number) => {
+    const steps = 6;
+    const sides = 5;
+    const base = rp.length / 3;
+    const bez = (t: number) => {
+      const u = 1 - t;
+      return a
+        .clone()
+        .multiplyScalar(u * u)
+        .add(b.clone().multiplyScalar(2 * u * t))
+        .add(c.clone().multiplyScalar(t * t));
+    };
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const p = bez(t);
+      const tan = bez(Math.min(1, t + 0.08)).sub(p);
+      if (tan.lengthSq() < 1e-12) tan.copy(inferior);
+      tan.normalize();
+      const ref = Math.abs(tan.dot(right)) > 0.85 ? anterior : right;
+      const n1 = new THREE.Vector3().crossVectors(tan, ref).normalize();
+      const n2 = new THREE.Vector3().crossVectors(tan, n1).normalize();
+      const rad = radius * (1 - t * 0.4);
+      for (let j = 0; j <= sides; j++) {
+        const ang = (j / sides) * Math.PI * 2;
+        const q = p.clone().addScaledVector(n1, Math.cos(ang) * rad).addScaledVector(n2, Math.sin(ang) * rad);
+        rp.push(q.x, q.y, q.z);
+      }
+    }
+    const stride = sides + 1;
+    for (let i = 0; i < steps; i++) {
+      for (let j = 0; j < sides; j++) {
+        const s0 = base + i * stride + j;
+        const s1 = s0 + stride;
+        ri.push(s0, s0 + 1, s1, s0 + 1, s1 + 1, s1);
+      }
+    }
+  };
+
+  for (let s = 0; s < 28; s++) {
+    const t = 0.04 + (s / 27) * 0.9;
+    const fr = frameAt(t);
+    const rad = radii(t);
+    for (const side of [-1, 1]) {
+      for (const dorsal of [0, 1]) {
+        const ang = side * (dorsal ? 2.2 : 0.72);
+        const start = fr.p
+          .clone()
+          .addScaledVector(fr.right, Math.sin(ang) * rad.trans * 0.96)
+          .addScaledVector(fr.anterior, Math.cos(ang) * rad.ap * 0.96);
+        const travel = mm(9 + t * 36);
+        const dir = fr.right
+          .clone()
+          .multiplyScalar(side * 0.7)
+          .addScaledVector(fr.tangent, 0.28 + t * 1.4)
+          .addScaledVector(fr.anterior, dorsal ? -0.25 : 0.4)
+          .normalize();
+        const mid = start.clone().addScaledVector(dir, travel * 0.45);
+        const end = start.clone().addScaledVector(dir, travel);
+        addStrand(start, mid, end, mm(dorsal ? 0.42 : 0.36));
+      }
+    }
+  }
+  const tip = frameAt(0.97);
+  for (let i = 0; i < 18; i++) {
+    const side = i % 2 === 0 ? 1 : -1;
+    const start = tip.p.clone().addScaledVector(tip.right, side * mm(0.8 + (i % 4) * 0.35));
+    const end = tip.p
+      .clone()
+      .addScaledVector(inferior, mm(78 + (i % 6) * 16))
+      .addScaledVector(right, side * mm(3.5 + (i % 5) * 1.4))
+      .addScaledVector(anterior, mm(((i % 5) - 2) * 1.5));
+    const mid = start.clone().lerp(end, 0.42).addScaledVector(right, side * mm(1.6));
+    addStrand(start, mid, end, mm(0.34));
+  }
+  const rootGeo = new THREE.BufferGeometry();
+  rootGeo.setAttribute("position", new THREE.Float32BufferAttribute(rp, 3));
+  rootGeo.setIndex(ri);
+  rootGeo.computeVertexNormals();
+  return { cordGeo, rootGeo };
 }
 
 type Controls = {
@@ -853,7 +1085,7 @@ function Specimen() {
               const id = data.bx_id ?? parcelIndex;
               const specimen = varyColor(CAT_BY_ID[cat].color, id);
               const parcel = parcelColor(cat, parcelIndex++);
-              const mat = makeMaterial(cat, specimen);
+              const mat = makeMaterial(cat, specimen, id);
               const previous = mesh.material;
               mesh.material = mat;
               if (Array.isArray(previous)) previous.forEach((m) => m.dispose());
@@ -960,7 +1192,7 @@ function Specimen() {
             for (const env of envelopes) {
               const geo = buildHull(hullPoints, center, env.scale, env.smooth);
               const specimen = new THREE.Color(CAT_BY_ID[env.cat].color);
-              const mat = makeMaterial(env.cat, specimen);
+              const mat = makeMaterial(env.cat, specimen, env.cat === "dura" ? 2 : 5);
               const mesh = new THREE.Mesh(geo, mat);
               mesh.position.copy(center);
               const key = `env:${env.cat}`;
@@ -995,6 +1227,93 @@ function Specimen() {
                 ta2: "Meninges",
                 blurb: env.blurb,
               });
+            }
+
+            const medullas = records.filter((r) => r.label === "Medulla oblongata");
+            if (medullas.length) {
+              const inferior = superior.clone().negate();
+              let minS = Infinity;
+              const tmp = new THREE.Vector3();
+              for (const rec of medullas) {
+                const pos = rec.mesh.geometry.getAttribute("position");
+                for (let i = 0; i < pos.count; i++) {
+                  tmp.fromBufferAttribute(pos, i);
+                  const s = tmp.dot(superior);
+                  if (s < minS) minS = s;
+                }
+              }
+              const band = 8 / unitToMm;
+              const caudal: THREE.Vector3[] = [];
+              for (const rec of medullas) {
+                const pos = rec.mesh.geometry.getAttribute("position");
+                for (let i = 0; i < pos.count; i++) {
+                  tmp.fromBufferAttribute(pos, i);
+                  if (tmp.dot(superior) <= minS + band) caudal.push(tmp.clone());
+                }
+              }
+              if (caudal.length) {
+                const acc = new THREE.Vector3();
+                for (const p of caudal) acc.add(p);
+                acc.multiplyScalar(1 / caudal.length);
+                let radial = 0;
+                for (const p of caudal) {
+                  const d = p.clone().sub(acc);
+                  d.addScaledVector(superior, -d.dot(superior));
+                  radial += d.length();
+                }
+                const startMm = THREE.MathUtils.clamp((radial / caudal.length) * unitToMm * 0.78, 4.2, 8.2);
+                const origin = acc.clone().addScaledVector(superior, 2.5 / unitToMm);
+                const built = buildSpinalCord(origin, inferior, anterior, rightAxis, unitToMm, startMm);
+                const cordColor = new THREE.Color(CAT_BY_ID.spinal_cord.color);
+                const cordMat = makeMaterial("spinal_cord", cordColor, 11);
+                cordMat.bumpScale = 1.15 / unitToMm;
+                const rootMat = makeMaterial("cranial_nerves", new THREE.Color("#efe0c4"), 19);
+                const parts: [THREE.BufferGeometry, THREE.Material, string, string, string][] = [
+                  [built.cordGeo, cordMat, "cord:spinal", "Spinal cord", CAT_BY_ID.spinal_cord.blurb],
+                  [
+                    built.rootGeo,
+                    rootMat,
+                    "cord:roots",
+                    "Rootlets & cauda equina",
+                    "Ventral and dorsal rootlets leave the cord and, below the conus, continue as the cauda equina.",
+                  ],
+                ];
+                for (const [geo, mat, key, label, blurb] of parts) {
+                  const mesh = new THREE.Mesh(geo, mat);
+                  mesh.userData.key = key;
+                  gltf.scene.add(mesh);
+                  const restCenter = meshCenter(mesh);
+                  const specimen = (mat as THREE.MeshStandardMaterial).color.clone();
+                  records.push({
+                    key,
+                    mesh,
+                    mat: mat as THREE.MeshStandardMaterial,
+                    cat: "spinal_cord",
+                    side: "median",
+                    label,
+                    region: "Spinal cord",
+                    hay: `${label} spinal cord conus cauda equina cervical lumbar rootlets`.toLowerCase(),
+                    restCenter,
+                    restPosition: mesh.position.clone(),
+                    dir: inferior.clone(),
+                    radius: meshRadius(mesh),
+                    weight: CAT_BY_ID.spinal_cord.explode,
+                    glassy: false,
+                    specimen,
+                    parcel: parcelColor("spinal_cord", label.length),
+                    placed: false,
+                  });
+                  directory.push({
+                    key,
+                    label,
+                    side: "median",
+                    region: "Spinal cord",
+                    cat: "spinal_cord",
+                    ta2: "Spinal cord",
+                    blurb,
+                  });
+                }
+              }
             }
 
             const anchors: Frame["anchors"] = {};
@@ -1036,13 +1355,13 @@ function Specimen() {
             };
             directory.push(pia);
 
-            const dist = maxDim * 2.45;
+            const dist = maxDim * 3.7;
             const homeCam = center
               .clone()
               .addScaledVector(anterior, dist * 0.92)
               .addScaledVector(rightAxis, dist * 0.48)
               .addScaledVector(superior, dist * 0.36);
-            const homeTarget = center.clone().addScaledVector(superior, maxDim * 0.02);
+            const homeTarget = center.clone().addScaledVector(superior, -maxDim * 0.12);
             camera.position.copy(homeCam);
             camera.near = maxDim * 0.0015;
             camera.far = maxDim * 40;
@@ -1052,64 +1371,23 @@ function Specimen() {
             if (controls) {
               controls.target.copy(homeTarget);
               controls.minDistance = maxDim * 0.03;
-              controls.maxDistance = maxDim * 8;
+              controls.maxDistance = maxDim * 18;
               controls.update();
             }
 
             const floorY = box.min.y - maxDim * 0.045;
-            const dishMat = new THREE.MeshStandardMaterial({
-              color: "#7e888a",
-              metalness: 0.86,
-              roughness: 0.28,
-              envMapIntensity: 0.85,
-            });
-            const wallMat = dishMat.clone();
-            wallMat.color = new THREE.Color("#6a7476");
-            const dishW = Math.max(size.x, size.z) * 1.55;
-            const dishD = Math.max(size.x, size.z) * 1.35;
-            const floor = new THREE.Mesh(new THREE.BoxGeometry(dishW, maxDim * 0.025, dishD), dishMat);
-            floor.position.set(center.x, floorY, center.z);
-            const wallH = maxDim * 0.07;
-            const walls: THREE.Mesh[] = [];
-            const wallGeoLong = new THREE.BoxGeometry(dishW, wallH, maxDim * 0.02);
-            const wallGeoShort = new THREE.BoxGeometry(maxDim * 0.02, wallH, dishD);
-            const specs: [THREE.BufferGeometry, number, number][] = [
-              [wallGeoLong, center.x, center.z + dishD / 2],
-              [wallGeoLong, center.x, center.z - dishD / 2],
-              [wallGeoShort, center.x + dishW / 2, center.z],
-              [wallGeoShort, center.x - dishW / 2, center.z],
-            ];
-            for (const [geo, x, z] of specs) {
-              const wall = new THREE.Mesh(geo, wallMat);
-              wall.position.set(x, floorY + wallH / 2, z);
-              walls.push(wall);
-            }
-            const ao = new THREE.Mesh(
-              new THREE.CircleGeometry(maxDim * 0.62, 40),
-              new THREE.MeshBasicMaterial({ color: "#050708", transparent: true, opacity: 0.38, depthWrite: false }),
-            );
-            ao.rotation.x = -Math.PI / 2;
-            ao.position.set(center.x, floorY + maxDim * 0.02, center.z);
             const room = new THREE.Group();
-            room.add(floor, ao, ...walls);
             const barLen = 20 / unitToMm;
             const bar = new THREE.Mesh(
               new THREE.BoxGeometry(barLen, maxDim * 0.008, maxDim * 0.008),
               new THREE.MeshStandardMaterial({ color: "#d5e4df", metalness: 0.2, roughness: 0.4 }),
             );
-            bar.position.set(center.x, floorY + maxDim * 0.03, center.z + dishD * 0.42);
+            bar.position.set(center.x, floorY + maxDim * 0.03, center.z + maxDim * 0.72);
             const barTag = tagSprite("20 mm", "#d7eeea");
-            barTag.position.set(center.x + barLen * 0.9, floorY + maxDim * 0.08, center.z + dishD * 0.42);
+            barTag.position.set(center.x + barLen * 0.9, floorY + maxDim * 0.08, center.z + maxDim * 0.72);
             barTag.scale.set(maxDim * 0.16, maxDim * 0.08, 1);
             room.add(bar, barTag);
-            const tray = new THREE.Mesh(new THREE.BoxGeometry(maxDim * 1.15, maxDim * 0.02, maxDim * 0.95), dishMat);
-            const trayOrigin = new THREE.Vector3(center.x + dishW * 0.72, floorY, center.z);
-            tray.position.copy(trayOrigin);
-            room.add(tray);
-            const trayTag = tagSprite("TRAY", "#9fe6d6");
-            trayTag.position.set(trayOrigin.x, floorY + maxDim * 0.08, trayOrigin.z + maxDim * 0.42);
-            trayTag.scale.set(maxDim * 0.18, maxDim * 0.09, 1);
-            room.add(trayTag);
+            const trayOrigin = new THREE.Vector3(center.x + maxDim * 1.15, floorY, center.z);
 
             const leftMark = tagSprite("L", "#9eb0aa");
             const rightMark = tagSprite("R", "#9eb0aa");
@@ -1347,21 +1625,36 @@ function Specimen() {
 
       const color = state.mode === "parcellation" ? rec.parcel : rec.specimen;
       if (!rec.mat.color.equals(color)) rec.mat.color.copy(color);
-      if (rec.cat === "cortex") {
-        rec.mat.roughness = state.piaOn ? 0.36 : 0.78;
-        rec.mat.metalness = state.piaOn ? 0.07 : 0.02;
-        rec.mat.envMapIntensity = state.piaOn ? 0.72 : 0.28;
+      if (rec.cat === "cortex" || rec.cat === "cerebellum" || rec.cat === "deep_grey" || rec.cat === "brainstem" || rec.cat === "spinal_cord") {
+        const phys = rec.mat as THREE.MeshPhysicalMaterial;
+        const dull = rec.cat === "cortex" && !state.piaOn;
+        const rough0 = (rec.mat.userData.rough0 as number) ?? 0.46;
+        const coat0 = (rec.mat.userData.coat0 as number) ?? 0.16;
+        rec.mat.roughness = dull ? 0.78 : rough0;
+        rec.mat.metalness = 0.02;
+        rec.mat.envMapIntensity = dull ? 0.16 : rec.cat === "spinal_cord" ? 0.45 : rec.cat === "deep_grey" || rec.cat === "brainstem" ? 0.3 : 0.38;
+        if (phys.isMeshPhysicalMaterial) {
+          phys.clearcoat = dull ? 0.02 : coat0 + pulse * 0.05;
+          phys.sheen = dull ? 0.02 : rec.cat === "spinal_cord" ? 0.16 : 0.12;
+        }
       }
-      if (rec.cat === "arteries") {
-        rec.mat.emissive.set("#6a1a1c");
-        rec.mat.emissiveIntensity = 0.05 + pulse * 0.85;
+      if (state.selected === rec.key && rec.cat !== "arteries" && rec.cat !== "veins_sinuses") {
+        rec.mat.emissive.set("#123f36");
+        rec.mat.emissiveIntensity = 0.42;
+      } else if (rec.cat === "arteries" || rec.cat === "veins_sinuses") {
+        rec.mat.emissive.copy(rec.specimen).multiplyScalar(0.18);
+        rec.mat.emissiveIntensity = (rec.cat === "arteries" ? 0.1 : 0.06) + pulse * (rec.cat === "arteries" ? 0.62 : 0.28);
       } else if (/choroid/i.test(rec.label)) {
         rec.mat.emissive.set("#6a3034");
         rec.mat.emissiveIntensity = 0.12 + pulse * 0.4;
-      } else if (state.selected === rec.key) {
-        rec.mat.emissive.set("#123f36");
-        rec.mat.emissiveIntensity = 0.42;
-      } else {
+      } else if (rec.cat === "cortex" || rec.cat === "cerebellum" || rec.cat === "deep_grey" || rec.cat === "brainstem") {
+        const dull = rec.cat === "cortex" && !state.piaOn;
+        rec.mat.emissive.set(dull ? "#000000" : "#3d1816");
+        rec.mat.emissiveIntensity = dull ? 0 : 0.02 + pulse * 0.02;
+      } else if (rec.cat === "spinal_cord") {
+        rec.mat.emissive.set("#5a4038");
+        rec.mat.emissiveIntensity = 0.02 + pulse * 0.02;
+      } else if (rec.mat.emissiveIntensity !== 0) {
         rec.mat.emissive.set("#000000");
         rec.mat.emissiveIntensity = 0;
       }
@@ -1409,12 +1702,12 @@ function Specimen() {
 
   return (
     <>
-      <hemisphereLight args={["#f4f7f8", "#2a2420", 0.48]} />
-      <ambientLight intensity={0.2} />
-      <directionalLight ref={keyRef} position={[1, 2, 1]} intensity={2.4} />
-      <directionalLight ref={fillRef} position={[-1, 0.4, 0.2]} intensity={0.55} color="#c5d4dc" />
-      <directionalLight ref={rimRef} position={[0, 0.6, -1.6]} intensity={0.85} color="#f2efe6" />
-      <pointLight ref={transRef} position={[0, -1, 0]} intensity={0.45} color="#ffb090" distance={0} />
+      <hemisphereLight args={["#e7e4df", "#1c1816", 0.22]} />
+      <ambientLight intensity={0.1} />
+      <directionalLight ref={keyRef} position={[1, 2, 1]} intensity={1.65} />
+      <directionalLight ref={fillRef} position={[-1.4, 0.35, -0.4]} intensity={0.45} color="#f0e4d8" />
+      <directionalLight ref={rimRef} position={[0.2, 0.8, -1.8]} intensity={0.4} color="#d5e4f2" />
+      <pointLight ref={transRef} position={[0, -1.1, 0.2]} intensity={0.35} color="#ffb090" distance={0} />
       <group ref={rig} />
       <OrbitControls makeDefault enableDamping dampingFactor={0.08} enablePan maxPolarAngle={Math.PI * 0.96} minPolarAngle={0.05} />
       {booted &&
@@ -1449,12 +1742,21 @@ export function Stage() {
           alpha: false,
           localClippingEnabled: true,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.12,
+          toneMappingExposure: 1,
           powerPreference: "high-performance",
         }}
         onCreated={({ gl, scene }) => {
           gl.outputColorSpace = THREE.SRGBColorSpace;
-          scene.environmentIntensity = 0.35;
+          const maxAniso = gl.capabilities.getMaxAnisotropy();
+          for (const tex of tissueTextures()) tex.anisotropy = Math.min(8, maxAniso);
+          try {
+            const pmrem = new THREE.PMREMGenerator(gl);
+            scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+            scene.environmentIntensity = 0.28;
+            pmrem.dispose();
+          } catch {
+            scene.environmentIntensity = 0.35;
+          }
         }}
       >
         <color attach="background" args={["#101416"]} />

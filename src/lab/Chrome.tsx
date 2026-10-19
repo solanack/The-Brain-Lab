@@ -155,7 +155,7 @@ export function Chrome() {
             <button
               type="button"
               onClick={() => patch({ sheet: null })}
-              className="flex size-8 items-center justify-center rounded-full bg-surface-2"
+              className="flex size-11 items-center justify-center rounded-full bg-surface-2"
               aria-label="Close panel"
             >
               <X className="size-4" />
@@ -167,7 +167,7 @@ export function Chrome() {
         </div>
       )}
 
-      <footer className="pointer-events-auto flex items-center gap-2 overflow-x-auto border-t border-border bg-bg/85 px-2 py-2 backdrop-blur-md">
+      <footer className="pointer-events-auto relative z-30 flex items-center gap-2 overflow-x-auto border-t border-border bg-bg/85 px-2 py-2 backdrop-blur-md">
         <Tools />
         <div className="ml-auto flex gap-2 lg:hidden">
           <Pill active={sheet === "layers"} onClick={() => patch({ sheet: sheet === "layers" ? null : "layers" })}>

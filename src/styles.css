@@ -71,7 +71,7 @@
 .vignette {
   background: radial-gradient(
     ellipse at center,
-    transparent 48%,
-    color-mix(in srgb, var(--color-bg) 62%, transparent) 100%
+    transparent 50%,
+    color-mix(in srgb, #1a100e 58%, transparent) 100%
   );
 }

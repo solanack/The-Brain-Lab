@@ -9,6 +9,7 @@ export const CAT_IDS = [
   "diencephalon",
   "ventricles",
   "brainstem",
+  "spinal_cord",
   "cerebellum",
   "arteries",
   "veins_sinuses",
@@ -162,6 +163,19 @@ export const CATEGORIES: CatMeta[] = [
     transparent: false,
   },
   {
+    id: "spinal_cord",
+    label: "Spinal cord",
+    group: "Stem & cerebellum",
+    blurb:
+      "Continuation of the medulla through the cervical and lumbar enlargements to the conus. Pia-covered white matter, with the anterior spinal artery in the ventral fissure, posterior spinal arteries, and the rootlets that become the cauda equina.",
+    color: "#eadccf",
+    opacity: 1,
+    visible: true,
+    explode: 1.15,
+    rough: 0.36,
+    transparent: false,
+  },
+  {
     id: "cerebellum",
     label: "Cerebellum",
     group: "Stem & cerebellum",
@@ -309,6 +323,12 @@ const PEARLS: Record<string, string> = {
     "Inferior olivary nucleus of the medulla. Climbing fibers from here reach Purkinje cells of the opposite cerebellum.",
   "medulla oblongata":
     "Caudal brainstem. Pyramids in front, olives lateral, and the vital respiratory and vasomotor circuitry in the tegmentum.",
+  "spinal cord":
+    "The cord begins at the pyramidal decussation and ends as the conus near the L1 vertebral level. Cervical and lumbar enlargements supply the limbs. A deep anterior median fissure carries the anterior spinal artery; the posterior median sulcus is shallower.",
+  "cauda equina":
+    "Lumbar and sacral rootlets that have already left the cord and keep descending inside the lumbar cistern to their exit foramina. The cord itself has ended.",
+  "rootlets":
+    "Ventral rootlets leave the anterolateral sulcus, dorsal rootlets the posterolateral sulcus. They stay paired and become longer as the segments descend.",
   midbrain:
     "Mesencephalon: cerebral peduncles, substantia nigra, tegmentum, and the colliculi, with the aqueduct between tectum and tegmentum.",
   pons: "Ventral pons is a mass of pontine nuclei and transverse fibers entering the middle cerebellar peduncles. The tegmentum keeps the cranial-nerve nuclei.",
