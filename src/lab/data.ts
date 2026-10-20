@@ -92,7 +92,7 @@ export const CATEGORIES: CatMeta[] = [
     group: "Telencephalon",
     blurb:
       "Centrum semiovale and the large commissures (corpus callosum, anterior commissure, fornix). Myelinated axons under the cortex. Fade the hemispheres or cut a section to read them.",
-    color: "#f3eee4",
+    color: "#e8a898",
     opacity: 1,
     visible: true,
     explode: 0.28,
@@ -105,7 +105,7 @@ export const CATEGORIES: CatMeta[] = [
     group: "Telencephalon",
     blurb:
       "Population-average pathways (corticospinal, arcuate, radiations, and others). Placement is about 7 mm, for study, not for a surgical plan.",
-    color: "#efe4cc",
+    color: "#e39d94",
     opacity: 1,
     visible: false,
     explode: 0.72,
@@ -170,7 +170,7 @@ export const CATEGORIES: CatMeta[] = [
     group: "Stem & cerebellum",
     blurb:
       "Continuation of the medulla through the cervical and lumbar enlargements to the conus. Pia-covered white matter, with the anterior spinal artery in the ventral fissure, posterior spinal arteries, and the rootlets that become the cauda equina.",
-    color: "#eadccf",
+    color: "#e8b0a4",
     opacity: 1,
     visible: true,
     explode: 1.15,
@@ -222,7 +222,7 @@ export const CATEGORIES: CatMeta[] = [
     group: "Vessels & nerves",
     blurb:
       "Nerves III–XII as they leave the brainstem, including branches that run out toward the face. Hidden in the intact view so the specimen stays a brain, not a skull-base dissection.",
-    color: "#e4d4ae",
+    color: "#e4a898",
     opacity: 1,
     visible: false,
     explode: 0.4,
@@ -235,7 +235,7 @@ export const CATEGORIES: CatMeta[] = [
     group: "Orbit & visual pathway",
     blurb:
       "The eyeball, without lids or facial skin. A pale sclera over a darker choroid, with the intraorbital optic nerve continuing CN II onto the posterior pole.",
-    color: "#efe6df",
+    color: "#f0d0c8",
     opacity: 1,
     visible: false,
     explode: 0.7,
@@ -457,7 +457,7 @@ export const RECIPES: Recipe[] = [
     want: { label: "Precentral gyrus", side: "left", cat: "cortex" },
     internal: false,
     strata: [
-      { name: "I · Molecular", tint: "#efe4dc", from: 0.9, to: 1, cells: "glia", count: 8 },
+      { name: "I · Molecular", tint: "#f0c8bc", from: 0.9, to: 1, cells: "glia", count: 8 },
       { name: "II · External granular", tint: "#e4c8ba", from: 0.78, to: 0.9, cells: "small-pyramid", count: 12 },
       { name: "III · External pyramidal", tint: "#d7b0a2", from: 0.58, to: 0.78, cells: "pyramid", count: 14 },
       { name: "IV · Internal granular", tint: "#d2b48a", from: 0.5, to: 0.58, cells: "granule", count: 6 },
@@ -472,7 +472,7 @@ export const RECIPES: Recipe[] = [
     want: { label: "Cuneus", side: "left", cat: "cortex" },
     internal: false,
     strata: [
-      { name: "I · Molecular", tint: "#efe4dc", from: 0.92, to: 1, cells: "glia", count: 6 },
+      { name: "I · Molecular", tint: "#f0c8bc", from: 0.92, to: 1, cells: "glia", count: 6 },
       { name: "II · External granular", tint: "#e4c8ba", from: 0.82, to: 0.92, cells: "small-pyramid", count: 10 },
       { name: "III · External pyramidal", tint: "#d7b0a2", from: 0.66, to: 0.82, cells: "pyramid", count: 10 },
       { name: "IV · Granular + Gennari", tint: "#e7d7b0", from: 0.4, to: 0.66, cells: "granule", count: 26 },
@@ -488,10 +488,10 @@ export const RECIPES: Recipe[] = [
     fallbackCat: "cerebellum",
     internal: false,
     strata: [
-      { name: "Molecular layer", tint: "#f0e0d6", from: 0.62, to: 1, cells: "glia", count: 10 },
+      { name: "Molecular layer", tint: "#f0c8bc", from: 0.62, to: 1, cells: "glia", count: 10 },
       { name: "Purkinje row", tint: "#e7c2b0", from: 0.5, to: 0.62, cells: "purkinje", count: 7 },
       { name: "Granule layer", tint: "#c9a090", from: 0.22, to: 0.5, cells: "granule", count: 28 },
-      { name: "Cerebellar white matter", tint: "#f3eee4", from: 0.02, to: 0.22, cells: "none", count: 0 },
+      { name: "Cerebellar white matter", tint: "#e8a898", from: 0.02, to: 0.22, cells: "none", count: 0 },
     ],
   },
   {
@@ -501,9 +501,9 @@ export const RECIPES: Recipe[] = [
     want: { label: "Hippocampus", side: "left", cat: "cortex" },
     internal: true,
     strata: [
-      { name: "Stratum radiatum / moleculare", tint: "#efe4dc", from: 0.62, to: 1, cells: "glia", count: 8 },
+      { name: "Stratum radiatum / moleculare", tint: "#f0c8bc", from: 0.62, to: 1, cells: "glia", count: 8 },
       { name: "Pyramidal band (CA)", tint: "#d7b0a2", from: 0.38, to: 0.62, cells: "pyramid", count: 16 },
-      { name: "Polymorphic / alveus", tint: "#f3eee4", from: 0.04, to: 0.38, cells: "fusiform", count: 8 },
+      { name: "Polymorphic / alveus", tint: "#e8a898", from: 0.04, to: 0.38, cells: "fusiform", count: 8 },
     ],
   },
 ];

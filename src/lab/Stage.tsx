@@ -150,8 +150,8 @@ function parcelColor(cat: CatId, index: number) {
     arachnoid: [0.46, 0.52],
     meninges_dura: [0.07, 0.12],
     cortex: [0.01, 0.08],
-    white_matter: [0.09, 0.13],
-    tracts: [0.08, 0.14],
+    white_matter: [0.01, 0.04],
+    tracts: [0.0, 0.03],
     deep_grey: [0.98, 1.04],
     diencephalon: [0.02, 0.07],
     ventricles: [0.45, 0.53],
@@ -167,8 +167,8 @@ function parcelColor(cat: CatId, index: number) {
   const [a, b] = span[cat];
   const h = a + ((index * 0.61803398875) % 1) * (b - a);
   const pale = cat === "white_matter" || cat === "tracts";
-  const sat = pale ? 0.14 : cat === "arteries" ? 0.58 : cat === "ventricles" ? 0.22 : 0.34;
-  const light = pale ? 0.78 : cat === "ventricles" ? 0.74 : 0.56;
+  const sat = pale ? 0.4 : cat === "arteries" ? 0.58 : cat === "ventricles" ? 0.22 : 0.34;
+  const light = pale ? 0.64 : cat === "ventricles" ? 0.74 : 0.56;
   return new THREE.Color().setHSL(h % 1, sat, light);
 }
 
@@ -291,9 +291,9 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
   else applyTriplanar(mat, cat);
   mat.color.set(CAT_BY_ID[cat].color);
   if (cat === "cortex") mat.color.set("#c9a394");
-  if (cat === "white_matter") mat.color.set("#f3eee4");
-  if (cat === "tracts") mat.color.set("#efe4cc");
-  if (cat === "globe") mat.color.set("#efe6df");
+  if (cat === "white_matter") mat.color.set("#e8a898");
+  if (cat === "tracts") mat.color.set("#e39d94");
+  if (cat === "globe") mat.color.set("#f0d0c8");
   if (cat === "orbit") mat.color.set("#8f4e44");
   specimen.copy(mat.color);
   return mat;
@@ -517,7 +517,7 @@ function buildTissue(recipe: Recipe) {
   root.name = `tissue-${recipe.id}`;
   const rnd = mulberry32(recipe.id === "m1" ? 11 : recipe.id === "v1" ? 29 : recipe.id === "cb" ? 47 : 71);
   const layers: THREE.Group[] = [];
-  const axonMat = new THREE.MeshStandardMaterial({ color: "#f4efe6", roughness: 0.45, metalness: 0.02 });
+  const axonMat = new THREE.MeshStandardMaterial({ color: "#e8a898", roughness: 0.45, metalness: 0.02 });
   applyRepeating(axonMat, "white_matter", 0.00005, 3);
   const capMat = new THREE.MeshStandardMaterial({
     color: "#a33b3e",
@@ -555,8 +555,8 @@ function buildTissue(recipe: Recipe) {
     layer.add(slab);
 
     if (stratum.cells !== "none" && stratum.count > 0) {
-      const somaMat = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.45 });
-      const coneMat = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.55 });
+      const somaMat = new THREE.MeshStandardMaterial({ color: "#f0c2b6", roughness: 0.45 });
+      const coneMat = new THREE.MeshStandardMaterial({ color: "#e8b0a4", roughness: 0.55 });
       applyRepeating(somaMat, "cell", 0.00012, 2);
       applyRepeating(coneMat, "cell", 0.00008, 2);
       const soma = new THREE.InstancedMesh(UNIT.soma, somaMat, stratum.count);
@@ -622,7 +622,7 @@ function buildTissue(recipe: Recipe) {
   });
 
   const ecmMat = new THREE.MeshStandardMaterial({
-    color: "#f6f1ea",
+    color: "#e8b0a4",
     transparent: true,
     opacity: 0.05,
     depthWrite: false,
@@ -1016,7 +1016,7 @@ function makeRod() {
   const mesh = new THREE.Mesh(
     ROD_GEO,
     new THREE.MeshStandardMaterial({
-      color: "#e4d5c0",
+      color: "#e8a898",
       emissive: "#7a4e32",
       emissiveIntensity: 0.12,
       roughness: 0.58,
@@ -1046,7 +1046,7 @@ function placeRod(mesh: THREE.Mesh, a: THREE.Vector3, b: THREE.Vector3, radius: 
   mesh.quaternion.setFromUnitVectors(ROD_UP, _rodDir);
   mesh.scale.set(dead ? radius * 0.55 : radius, len, dead ? radius * 0.55 : radius);
   const mat = mesh.material as THREE.MeshStandardMaterial;
-  mat.color.set(dead ? "#8a8178" : hot ? "#f0e2d0" : "#e4d5c0");
+  mat.color.set(dead ? "#8a8178" : hot ? "#f0b8aa" : "#e8a898");
   mat.emissive.set(dead ? "#000000" : "#7a4e32");
   mat.emissiveIntensity = dead ? 0 : hot ? 0.22 : 0.08;
   mat.opacity = dead ? 0.12 : hot ? 0.82 : 0.46;
@@ -1190,11 +1190,11 @@ function addOrbitContents(
         blurb: pearlFor(label, cat),
       });
     };
-    const sclera = makeMaterial("globe", new THREE.Color("#efe6df"), side === "left" ? 31 : 32);
+    const sclera = makeMaterial("globe", new THREE.Color("#f0d0c8"), side === "left" ? 31 : 32);
     const choroid = makeMaterial("globe", new THREE.Color("#6e3a36"), side === "left" ? 33 : 34);
     (choroid as THREE.MeshPhysicalMaterial).transmission = 0;
     choroid.roughness = 0.74;
-    const nerveMat = makeMaterial("cranial_nerves", new THREE.Color("#e4d4ae"), side === "left" ? 35 : 36);
+    const nerveMat = makeMaterial("cranial_nerves", new THREE.Color("#e4a898"), side === "left" ? 35 : 36);
     const scleraGeo = new THREE.SphereGeometry(globeR, 28, 20);
     scleraGeo.translate(center.x, center.y, center.z);
     const choroidGeo = new THREE.SphereGeometry(globeR * 0.94, 22, 16);
@@ -1220,7 +1220,7 @@ function addOrbitContents(
     discMat.roughness = 0.62;
     (discMat as THREE.MeshPhysicalMaterial).transmission = 0;
     push(discGeo, discMat, `orbit:disc:${side}`, "Optic disc", "globe", "#e4b89a");
-    push(tubeBetween(tip, discAt, mm(1.8), mm(1.35)), nerveMat, `orbit:nerve:${side}`, "Optic nerve (II), intraorbital", "globe", "#e4d4ae");
+    push(tubeBetween(tip, discAt, mm(1.8), mm(1.35)), nerveMat, `orbit:nerve:${side}`, "Optic nerve (II), intraorbital", "globe", "#e4a898");
     const recti: [string, THREE.Vector3][] = [
       ["Superior rectus", vert],
       ["Inferior rectus", vert.clone().negate()],
@@ -1275,8 +1275,8 @@ function addOrbitContents(
       const geo = geos.length === 1 ? geos[0]! : mergeGeometries(geos, false);
       if (!geo) continue;
       if (geos.length > 1) geos.forEach((item) => item.dispose());
-      const mat = makeMaterial("cranial_nerves", new THREE.Color("#e4d4ae"), filamentLabel.length + (side === "left" ? 3 : 9));
-      push(geo, mat, `orbit:inn:${side}:${nerveLabel}`, filamentLabel, "cranial_nerves", "#e4d4ae");
+      const mat = makeMaterial("cranial_nerves", new THREE.Color("#e4a898"), filamentLabel.length + (side === "left" ? 3 : 9));
+      push(geo, mat, `orbit:inn:${side}:${nerveLabel}`, filamentLabel, "cranial_nerves", "#e4a898");
     }
     if (side === "left" && chiasm) {
       const mid = chiasm.restCenter;
@@ -1290,8 +1290,8 @@ function addOrbitContents(
         false,
       );
       if (cross) {
-        const mat = makeMaterial("cranial_nerves", new THREE.Color("#f0d8b0"), 91);
-        push(cross, mat, "orbit:decussation", "Chiasmatic decussation", "cranial_nerves", "#f0d8b0", "median");
+        const mat = makeMaterial("cranial_nerves", new THREE.Color("#e8a898"), 91);
+        push(cross, mat, "orbit:decussation", "Chiasmatic decussation", "cranial_nerves", "#e8a898", "median");
       }
     }
   }
@@ -1533,7 +1533,7 @@ function addSectionCaps(records: Rec[], scene: THREE.Scene, radius: number) {
     rec.mesh.renderOrder = 3;
   }
   const capMat = new THREE.MeshStandardMaterial({
-    color: "#b7c3c1",
+    color: "#e8a898",
     roughness: 0.98,
     metalness: 0,
     side: THREE.DoubleSide,
@@ -1835,7 +1835,7 @@ function Specimen() {
                 const cordColor = new THREE.Color(CAT_BY_ID.spinal_cord.color);
                 const cordMat = makeMaterial("spinal_cord", cordColor, 11);
                 cordMat.bumpScale = 1.15 / unitToMm;
-                const rootMat = makeMaterial("cranial_nerves", new THREE.Color("#efe0c4"), 19);
+                const rootMat = makeMaterial("cranial_nerves", new THREE.Color("#e4a898"), 19);
                 const parts: [THREE.BufferGeometry, THREE.Material, string, string, string][] = [
                   [built.cordGeo, cordMat, "cord:spinal", "Spinal cord", CAT_BY_ID.spinal_cord.blurb],
                   [
@@ -2306,7 +2306,7 @@ function Specimen() {
         }
       }
       if (rec.cat === "white_matter" || rec.cat === "tracts") {
-        rec.mat.color.set(state.mode === "parcellation" ? rec.parcel : rec.cat === "white_matter" ? "#f3eee4" : "#efe4cc");
+        rec.mat.color.set(state.mode === "parcellation" ? rec.parcel : rec.cat === "white_matter" ? "#e8a898" : "#e39d94");
         rec.mat.envMapIntensity = 0.03;
         rec.mat.metalness = 0;
         rec.mat.roughness = 0.82;
