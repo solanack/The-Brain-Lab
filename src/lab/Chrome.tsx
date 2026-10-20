@@ -359,17 +359,25 @@ function closeModule() {
     scenario: null,
     tour: null,
     opacity: state.restoreOpacity ?? state.opacity,
+    visible: savedView?.visible ?? state.visible,
+    hidden: savedView?.hidden ?? state.hidden,
+    explode: savedView?.explode ?? state.explode,
     restoreOpacity: null,
     measuring: false,
     measure: [],
     selected: null,
     sheet: null,
   });
+  savedView = null;
+  state.request({ type: "home" });
 }
+
+let savedView: { visible: Record<string, boolean>; hidden: Record<string, boolean>; explode: number } | null = null;
 
 function openModule(id: ScenarioId) {
   const state = useLab.getState();
   const spec = SCENARIO_BY_ID[id];
+  if (!savedView) savedView = { visible: { ...state.visible }, hidden: { ...state.hidden }, explode: state.explode };
   const visible = { ...state.visible };
   for (const cat of spec.show) visible[cat] = true;
   const hidden = { ...state.hidden };
@@ -387,6 +395,7 @@ function openModule(id: ScenarioId) {
     isolated: null,
     sectionOn: false,
     sheet: null,
+    ...(spec.explode != null ? { explode: spec.explode } : {}),
   });
 }
 
@@ -570,28 +579,7 @@ function Layers() {
         >
           Parotid
         </Pill>
-        <Pill
-          onClick={() => {
-            const state = useLab.getState();
-            const visible = { ...state.visible, hn_gland: true, hn_nerve: true, hn_vessel: true, hn_viscera: true, hn_bone: false, airway: true };
-            const hidden = { ...state.hidden };
-            for (const item of state.directory) {
-              if (!item.cat.startsWith("hn_") && item.cat !== "airway") continue;
-              hidden[item.key] = !/thyroid|parathyroid|recurrent|larynx|cricoid|trachea|esophagus/i.test(item.label);
-            }
-            const focus = state.directory.find((item) => item.label === "Thyroid gland");
-            state.patch({
-              visible,
-              hidden,
-              opacity: { ...state.opacity, cortex: 0.05, hn_gland: 1, hn_nerve: 1, hn_vessel: 1, hn_viscera: 0.85, airway: 0.7 },
-              explode: 0.42,
-              isolated: null,
-            });
-            if (focus) state.request({ type: "part", key: focus.key });
-          }}
-        >
-          Thyroid
-        </Pill>
+        <Pill onClick={() => openModule("thyroid")}>Thyroid</Pill>
       </div>
 
       <label className="flex h-11 items-center gap-2 rounded-full border border-border bg-surface px-3">

@@ -1,6 +1,6 @@
 import type { CatId } from "./data";
 
-export const SCENARIO_IDS = ["reach", "see", "hear", "fear", "speech", "memory", "breathe", "autonomic", "exit"] as const;
+export const SCENARIO_IDS = ["reach", "see", "hear", "fear", "speech", "memory", "breathe", "autonomic", "thyroid", "exit"] as const;
 
 export type ScenarioId = (typeof SCENARIO_IDS)[number];
 
@@ -35,6 +35,8 @@ export type Scenario = {
   cats: CatId[];
   show: CatId[];
   fade: Partial<Record<CatId, number>>;
+  glow?: string[];
+  explode?: number;
   stops: ModuleStop[];
 };
 
@@ -514,6 +516,52 @@ export const SCENARIOS: Scenario[] = [
       },
     ],
   },
+  {
+    id: "thyroid",
+    title: "Thyroid / recurrent laryngeal",
+    note: "Recurrent laryngeal nerve runs in the tracheoesophageal groove, close to the inferior thyroid artery. Identify it before dividing the artery. Teaching approximation. Not a surgical plan.",
+    labels: ["thyroid gland", "thyroid isthmus", "inferior thyroid artery", "recurrent laryngeal", "trachea", "carotid sheath"],
+    cats: [],
+    show: ["hn_gland", "hn_nerve", "hn_vessel", "hn_viscera", "airway"],
+    fade: {
+      cortex: 0.04,
+      white_matter: 0.03,
+      cerebellum: 0.03,
+      brainstem: 0.08,
+      lungs: 0.05,
+      heart: 0.08,
+      pleura: 0.04,
+      diaphragm: 0.05,
+      hn_muscle: 0.04,
+      hn_bone: 0.06,
+      dura: 0.04,
+      arachnoid: 0.04,
+    },
+    glow: ["recurrent laryngeal", "inferior thyroid artery"],
+    explode: 0.32,
+    stops: [
+      {
+        title: "Recurrent laryngeal nerve",
+        label: "Recurrent laryngeal nerve",
+        note: "In the tracheoesophageal groove. It meets the inferior thyroid artery at the lower pole. Find the nerve before you divide the artery. Teaching approximation. Not a surgical plan.",
+      },
+      {
+        title: "Inferior thyroid artery",
+        label: "Inferior thyroid artery",
+        note: "Crosses the recurrent laryngeal nerve at the lower pole. Either structure may be in front. Teaching approximation. Not a surgical plan.",
+      },
+      {
+        title: "Thyroid gland",
+        label: "Thyroid gland",
+        note: "The lobe lies on the trachea. The nerve and the artery are at the lower pole, in the groove. Teaching approximation. Not a surgical plan.",
+      },
+      {
+        title: "Trachea",
+        label: "Trachea",
+        note: "The airway behind the isthmus. The nerve ascends on either side, in the groove with the esophagus. Teaching approximation. Not a surgical plan.",
+      },
+    ],
+  },
 ];
 
 export const SCENARIO_BY_ID = Object.fromEntries(SCENARIOS.map((item) => [item.id, item])) as Record<ScenarioId, Scenario>;
@@ -618,6 +666,11 @@ function labelListed(label: string, keys: string[]) {
     if (before && after) return true;
   }
   return false;
+}
+
+export function glowHit(label: string, glow: string[] | undefined) {
+  if (!glow?.length) return false;
+  return labelListed(label, glow.map((item) => item.toLowerCase()));
 }
 
 function stopNames(stop: ModuleStop, label: string, cat: CatId) {

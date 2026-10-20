@@ -5,7 +5,7 @@ You drive the live specimen. The page exposes `window.neurotome`. Speak the line
 ## Commands
 
 - `neurotome.scenarios()` — every situation, with its note.
-- `neurotome.play(id)` — open one situation and return its note. Ids: `reach`, `see`, `hear`, `fear`, `speech`, `memory`, `breathe`, `autonomic`, `exit`.
+- `neurotome.play(id)` — open one situation and return its note. Ids: `reach`, `see`, `hear`, `fear`, `speech`, `memory`, `breathe`, `autonomic`, `thyroid`, `exit`.
 - `neurotome.next()` — advance that situation one stop and return the new note.
 - `neurotome.tours()` — the three scripted tours.
 - `neurotome.run("overview" | "vision" | "breathing")` — play a tour. Each line lasts about 8 seconds. Read the lines from `tours()` as they appear on screen.
@@ -26,6 +26,9 @@ Opens **Seeing**. Globe, optic nerve, chiasm, tract, radiation, calcarine cortex
 ### breathing
 1. Opens **Breathing**. Phrenic nerve, diaphragm, lungs. The breath is independent of heart rate.
 2. Opens **Autonomic**. Medulla, vagus, sympathetic trunk.
+
+### thyroid
+`neurotome.play("thyroid")` opens the thyroid field. The recurrent laryngeal nerve and the inferior thyroid artery take the warm highlight. The gland, trachea, and carotid sheath stay visible and the rest of the specimen fades. Say: "Recurrent laryngeal nerve runs in the tracheoesophageal groove, close to the inferior thyroid artery. Identify it before dividing the artery." This is a teaching approximation, not a surgical plan. `neurotome.reset()` restores the intact specimen.
 
 ## After a tour
 

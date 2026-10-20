@@ -19,7 +19,7 @@ import {
   type Stratum,
 } from "./data";
 import { useLab, type Axis, type Meta } from "./store";
-import { SCENARIO_BY_ID, circuitLinks, lostToCut, scenarioFocus, scenarioHit, type ModuleStop } from "./scenarios";
+import { SCENARIO_BY_ID, circuitLinks, glowHit, lostToCut, scenarioFocus, scenarioHit, type ModuleStop } from "./scenarios";
 import { applyHeartMap, applyLungMap, applyPericardiumMap, applyRepeating, applySpinalUv, applyTriplanar, nerveMaterial, tissueTextures } from "./textures";
 import { buildPeripheral } from "./nerves";
 import { buildCirculation } from "./heart";
@@ -2797,6 +2797,7 @@ function Specimen() {
         }
       }
       const lit = scenarioOn?.has(rec.key) ?? false;
+      const warm = lit && state.scenario != null && (SCENARIO_BY_ID[state.scenario].glow?.length ? glowHit(rec.label, SCENARIO_BY_ID[state.scenario].glow) : true);
       const cutAt = state.tour && state.scenario === state.tour.id ? state.tour.index : -1;
       const dead =
         state.scenario != null &&
@@ -2816,7 +2817,7 @@ function Specimen() {
         rec.mat.color.lerp(SCENARIO_ASH, 0.62);
         rec.mat.color.multiplyScalar(0.78);
       }
-      if (scenarioOn && lit && !dead) {
+      if (scenarioOn && lit && !dead && warm) {
         rec.mat.color.lerp(SCENARIO_GOLD, state.selected === rec.key ? 0.22 : 0.1);
         rec.mat.emissive.set("#6b3a28");
         rec.mat.emissiveIntensity = (state.selected === rec.key ? 0.1 : 0.045) + breathe * 0.03;

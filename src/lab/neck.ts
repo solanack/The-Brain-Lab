@@ -269,14 +269,14 @@ export function buildHeadNeck(opts: {
     const thyroidLobe = neck(92, 24, s(16));
     push(bar(bifur.clone().addScaledVector(inferior, mm(4)), thyroidLobe, mm(1.05), mm(0.75), 5), `hn:sta:${side}`, "Superior thyroid artery", "hn_vessel", side, "First anterior branch of the external carotid. It runs with the external laryngeal nerve down to the upper pole of the thyroid.", inferior.clone().add(anterior).normalize(), "#c44048");
     const infThy = thyroidLobe.clone().addScaledVector(inferior, mm(12)).addScaledVector(lat, mm(-4));
-    push(bar(neck(130, 10, s(22)), infThy, mm(1), mm(0.7), 5), `hn:ita:${side}`, "Inferior thyroid artery", "hn_vessel", side, "From the thyrocervical trunk. It crosses the recurrent laryngeal nerve at the lower pole of the thyroid. The usual danger zone in a thyroidectomy.", lat.clone().add(anterior).normalize(), "#c44048");
+    push(bar(neck(130, 10, s(22)), infThy, mm(1), mm(0.7), 5), `hn:ita:${side}`, "Inferior thyroid artery", "hn_vessel", side, "From the thyrocervical trunk. It crosses the recurrent laryngeal nerve in the tracheoesophageal groove at the lower pole. Identify the nerve before dividing this artery.", lat.clone().add(anterior).normalize(), "#c44048");
 
     push(bar(jugular, inlet.clone().addScaledVector(lat, mm(8)), mm(3.1), mm(2.6), 7), `hn:ijv:${side}`, "Internal jugular vein", "hn_vessel", side, "Leaves the jugular foramen and runs in the carotid sheath, lateral to the carotid. Deep cervical nodes lie along it.", lat, "#6e4568");
 
     const vagusTop = jugular.clone().addScaledVector(anterior, mm(2));
     push(bar(vagusTop, inlet.clone().addScaledVector(anterior, mm(2)), mm(1.2), mm(1), 6), `hn:x:${side}`, "Vagus nerve, cervical", "hn_nerve", side, "In the carotid sheath, between and behind the carotid and the internal jugular vein. It continues into the thorax.", inferior, "#e4a898");
     const rlnTop = neck(48, 18, s(6));
-    push(bar(infThy.clone().addScaledVector(anterior, mm(-4)), rlnTop, mm(0.85), mm(0.7), 5), `hn:rln:${side}`, "Recurrent laryngeal nerve", "hn_nerve", side, side === "left" ? "Loops under the aortic arch, then ascends in the tracheoesophageal groove. It meets the inferior thyroid artery at the lower pole." : "Loops under the right subclavian artery, then ascends. It meets the inferior thyroid artery at the lower pole. Teaching course.", superior, "#e4a898");
+    push(bar(infThy.clone().addScaledVector(anterior, mm(-4)), rlnTop, mm(0.85), mm(0.7), 5), `hn:rln:${side}`, "Recurrent laryngeal nerve", "hn_nerve", side, side === "left" ? "Loops under the aortic arch, then ascends in the tracheoesophageal groove, close to the inferior thyroid artery. Identify it before dividing the artery." : "Loops under the right subclavian artery, then ascends in the tracheoesophageal groove, close to the inferior thyroid artery. Identify it before dividing the artery.", superior, "#e4a898");
 
     const acc = jugular.clone().addScaledVector(lat, mm(6)).addScaledVector(inferior, mm(8));
     const accEnd = neck(80, -4, s(48));
@@ -299,7 +299,7 @@ export function buildHeadNeck(opts: {
 
     push(ball(neck(78, 36, s(22)), mm(10), mm(8), mm(8), 8), `hn:submandibular:${side}`, "Submandibular gland", "hn_gland", side, "Under the mandible, over the digastric. The facial artery grooves its deep face. The lingual nerve and the submandibular duct are medial.", anterior.clone().add(lat).normalize(), "#e4b4a8");
 
-    push(ball(thyroidLobe, mm(12), mm(16), mm(9), 8), `hn:thyroid:${side}`, "Thyroid gland", "hn_gland", side, "Lobe on the side of the trachea, from the thyroid cartilage toward the 5th tracheal ring. The recurrent laryngeal nerve and the inferior thyroid artery meet at the lower pole.", anterior, "#c45a58");
+    push(ball(thyroidLobe, mm(12), mm(16), mm(9), 8), `hn:thyroid:${side}`, "Thyroid gland", "hn_gland", side, "Lobe on the trachea. The recurrent laryngeal nerve runs in the tracheoesophageal groove and meets the inferior thyroid artery at the lower pole. Identify the nerve before dividing the artery.", anterior, "#c45a58");
     push(ball(thyroidLobe.clone().addScaledVector(anterior, mm(-6)).addScaledVector(superior, mm(6)), mm(2.2), mm(2.2), mm(2), 6), `hn:para-sup:${side}`, "Superior parathyroid", "hn_gland", side, "Usually on the posterior thyroid, near the upper pole, above the inferior thyroid artery. Teaching site, not a patient localization.", anterior.clone().negate(), "#d7a090");
     push(ball(thyroidLobe.clone().addScaledVector(anterior, mm(-5)).addScaledVector(inferior, mm(8)), mm(2.2), mm(2.2), mm(2), 6), `hn:para-inf:${side}`, "Inferior parathyroid", "hn_gland", side, "More variable. Often near the lower pole, close to where the inferior thyroid artery and the recurrent laryngeal nerve cross.", anterior.clone().negate(), "#d7a090");
 
