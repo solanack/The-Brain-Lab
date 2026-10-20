@@ -10,32 +10,71 @@ export type NervePart = {
   blurb: string;
 };
 
-type Buf = { p: number[]; ix: number[] };
+type Buf = { p: number[]; ix: number[]; uv: number[] };
 
-function tube(buf: Buf, pts: THREE.Vector3[], radius: number) {
-  if (pts.length < 2) return;
-  const sides = 5;
+const fresh = (): Buf => ({ p: [], ix: [], uv: [] });
+
+function tube(buf: Buf, pts: THREE.Vector3[], radius: number, opts?: { taper?: number; swell?: number; swellAt?: number }) {
+  if (pts.length < 2 || radius <= 0) return;
+  let span = 0;
+  for (let i = 1; i < pts.length; i++) span += pts[i]!.distanceTo(pts[i - 1]!);
+  if (span < 1e-6) return;
+  const spacing = Math.max(radius * 1.7, span / 72);
+  const path: THREE.Vector3[] = [pts[0]!.clone()];
+  let walked = 0;
+  let acc = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1]!;
+    const b = pts[i]!;
+    const seg = b.distanceTo(a);
+    if (seg < 1e-8) continue;
+    while (walked + spacing <= acc + seg && walked + spacing < span - spacing * 0.2) {
+      walked += spacing;
+      path.push(a.clone().lerp(b, (walked - acc) / seg));
+    }
+    acc += seg;
+  }
+  path.push(pts[pts.length - 1]!.clone());
+
+  const sides = 8;
   const stride = sides + 1;
   const base = buf.p.length / 3;
   const up = new THREE.Vector3(0, 1, 0);
   const alt = new THREE.Vector3(1, 0, 0);
-  for (let i = 0; i < pts.length; i++) {
-    const prev = pts[Math.max(0, i - 1)]!;
-    const next = pts[Math.min(pts.length - 1, i + 1)]!;
+  const taper = opts?.taper ?? 0.72;
+  const swell = opts?.swell ?? 0;
+  const swellAt = opts?.swellAt ?? 0.45;
+  let travel = 0;
+  const dist = [0];
+  for (let i = 1; i < path.length; i++) {
+    travel += path[i]!.distanceTo(path[i - 1]!);
+    dist.push(travel);
+  }
+  const total = Math.max(travel, 1e-6);
+  for (let i = 0; i < path.length; i++) {
+    const prev = path[Math.max(0, i - 1)]!;
+    const next = path[Math.min(path.length - 1, i + 1)]!;
     const tan = next.clone().sub(prev);
     if (tan.lengthSq() < 1e-12) tan.copy(up);
     tan.normalize();
     const ref = Math.abs(tan.dot(up)) > 0.85 ? alt : up;
     const n1 = new THREE.Vector3().crossVectors(tan, ref).normalize();
     const n2 = new THREE.Vector3().crossVectors(tan, n1).normalize();
-    const end = i === 0 || i === pts.length - 1 ? 0.85 : 1;
+    const along = dist[i]! / total;
+    const wave = (Math.sin(dist[i]! / (radius * 16) * Math.PI * 2) * 0.55 + Math.cos(dist[i]! / (radius * 27) * Math.PI * 2) * 0.35) * radius;
+    const center = path[i]!.clone().addScaledVector(n1, wave).addScaledVector(n2, wave * 0.45);
+    const belly = swell > 0 ? 1 + swell * Math.exp(-(((along - swellAt) / 0.09) ** 2)) : 1;
+    const thick = radius * THREE.MathUtils.lerp(1, taper, along) * belly;
+    const v = dist[i]! / Math.max(radius * 3.2, 1e-6);
     for (let j = 0; j <= sides; j++) {
       const a = (j / sides) * Math.PI * 2;
-      const q = pts[i]!.clone().addScaledVector(n1, Math.cos(a) * radius * end).addScaledVector(n2, Math.sin(a) * radius * end);
+      const fasc = 1 + 0.13 * Math.cos(a * 4 + along * 9) + 0.05 * Math.cos(a * 7 - along * 5);
+      const q = center.clone().addScaledVector(n1, Math.cos(a) * thick * fasc).addScaledVector(n2, Math.sin(a) * thick * fasc);
       buf.p.push(q.x, q.y, q.z);
+      buf.uv.push(j / sides, v);
     }
   }
-  for (let i = 0; i < pts.length - 1; i++) {
+  for (let i = 0; i < path.length - 1; i++) {
     for (let j = 0; j < sides; j++) {
       const s0 = base + i * stride + j;
       const s1 = s0 + stride;
@@ -47,6 +86,7 @@ function tube(buf: Buf, pts: THREE.Vector3[], radius: number) {
 function geoOf(buf: Buf) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(buf.p, 3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(buf.uv, 2));
   geo.setIndex(buf.ix);
   geo.computeVertexNormals();
   return geo;
@@ -116,18 +156,16 @@ export function buildPeripheral(
   for (const sign of [1, -1] as const) {
     const side = sign > 0 ? "right" : "left";
     const s = (n: number) => n * sign;
-    const spinal: Buf = { p: [], ix: [] };
-    const intercostal: Buf = { p: [], ix: [] };
-    const sympathetic: Buf = { p: [], ix: [] };
+    const spinal: Buf = fresh();
+    const intercostal: Buf = fresh();
+    const sympathetic: Buf = fresh();
     const chainPts: THREE.Vector3[] = [];
     for (let i = 0; i < levels.length; i++) {
       const t = levels[i]!;
       const root = at(t, s(5.5), 1);
       const gang = at(t, s(14), 2);
       const nerve = at(t, s(t > 0.22 && t < 0.58 ? 32 : 26), 4);
-      tube(spinal, chain([root, gang]), mm(0.7));
-      tube(spinal, chain([gang, nerve]), mm(i < 8 || (i >= 20 && i < 25) ? 1.15 : 0.85));
-      tube(spinal, [gang, gang.clone().addScaledVector(inferior, mm(1.2))], mm(1.5));
+      tube(spinal, chain([root, gang, nerve], 5), mm(i < 8 || (i >= 20 && i < 25) ? 1.05 : 0.78), { taper: 0.7, swell: 0.85, swellAt: 0.38 });
       if (i >= 8 && i < 20) {
         const rib = at(t, s(110), 20);
         const front = at(t, s(28), 108);
@@ -135,65 +173,78 @@ export function buildPeripheral(
       }
       const gangOnChain = at(t, s(18), 8);
       chainPts.push(gangOnChain);
-      tube(sympathetic, chain([gang, gangOnChain], 3), mm(0.35));
+      tube(sympathetic, chain([gang, gangOnChain], 3), mm(0.32), { taper: 0.85 });
+      tube(
+        sympathetic,
+        chain(
+          [
+            gangOnChain.clone().addScaledVector(inferior, mm(-2.4)),
+            gangOnChain,
+            gangOnChain.clone().addScaledVector(inferior, mm(2.4)),
+          ],
+          3,
+        ),
+        mm(0.62),
+        { taper: 1, swell: 0.7, swellAt: 0.5 },
+      );
     }
     tube(sympathetic, chain(chainPts, 2), mm(0.7));
 
     const shoulder = at(0.22, s(158), 6);
     const axilla = at(0.2, s(78), 10);
     const roots = [0.13, 0.155, 0.18, 0.205, 0.235].map((t) => at(t, s(26), 4));
-    const plexus: Buf = { p: [], ix: [] };
+    const plexus: Buf = fresh();
     for (const root of roots) tube(plexus, chain([root, axilla, shoulder], 4), mm(1.05));
 
     const elbow = down(shoulder, 310, s(8), 18);
     const wrist = down(shoulder, 610, s(-6), 22);
     const hand = down(shoulder, 680, s(-4), 16);
-    const median: Buf = { p: [], ix: [] };
+    const median: Buf = fresh();
     tube(median, chain([shoulder, elbow, wrist, hand], 5), mm(0.85));
-    const ulnar: Buf = { p: [], ix: [] };
+    const ulnar: Buf = fresh();
     tube(
       ulnar,
       chain([shoulder, down(shoulder, 300, s(-18), 4), down(shoulder, 620, s(-16), 6), down(shoulder, 690, s(-14), 4)], 5),
       mm(0.72),
     );
-    const radial: Buf = { p: [], ix: [] };
+    const radial: Buf = fresh();
     tube(
       radial,
       chain([shoulder, down(shoulder, 180, s(16), -28), down(shoulder, 340, s(10), -8), down(shoulder, 600, s(12), 4)], 5),
       mm(0.8),
     );
-    const musc: Buf = { p: [], ix: [] };
+    const musc: Buf = fresh();
     tube(musc, chain([shoulder, down(shoulder, 40, s(22), 24), down(shoulder, 190, s(26), 20)], 4), mm(0.62));
-    const axillary: Buf = { p: [], ix: [] };
+    const axillary: Buf = fresh();
     tube(axillary, chain([shoulder, down(shoulder, 28, s(18), -22), down(shoulder, 55, s(8), -18)], 3), mm(0.58));
 
     const c4 = at(0.105, s(22), 16);
-    const phrenic: Buf = { p: [], ix: [] };
+    const phrenic: Buf = fresh();
     tube(phrenic, chain([c4, at(0.2, s(24), 28), at(0.34, s(26), 34), at(0.5, s(22), 48)], 4), mm(0.48));
 
     const hip = at(1.05, s(96), 12);
     const lumbarRoot = [0.6, 0.645, 0.69, 0.735].map((t) => at(t, s(26), 6));
-    const lumbar: Buf = { p: [], ix: [] };
+    const lumbar: Buf = fresh();
     const plexusPoint = at(0.68, s(42), 18);
     for (const root of lumbarRoot) tube(lumbar, chain([root, plexusPoint], 3), mm(0.9));
-    const femoral: Buf = { p: [], ix: [] };
+    const femoral: Buf = fresh();
     tube(femoral, chain([plexusPoint, at(0.92, s(78), 36), hip.clone().addScaledVector(anterior, mm(24)), down(hip, 420, s(6), 28)], 5), mm(0.95));
-    const obturator: Buf = { p: [], ix: [] };
+    const obturator: Buf = fresh();
     tube(obturator, chain([plexusPoint, at(0.9, s(48), 4), down(hip, 260, s(-8), 6)], 4), mm(0.62));
 
     const sacralRoots = [1.04, 1.1, 1.16, 1.22].map((t) => at(t, s(22), -4));
-    const sciatic: Buf = { p: [], ix: [] };
+    const sciatic: Buf = fresh();
     const knee = down(hip, 430, s(4), -18);
     for (const root of sacralRoots) tube(sciatic, chain([root, at(1.02, s(55), -16)], 3), mm(0.85));
     tube(sciatic, chain([at(1.02, s(55), -16), hip.clone().addScaledVector(anterior, mm(-22)), knee], 5), mm(1.15));
-    const tibial: Buf = { p: [], ix: [] };
+    const tibial: Buf = fresh();
     tube(tibial, chain([knee, down(hip, 640, s(2), -16), down(hip, 860, s(-4), -8)], 5), mm(0.8));
-    const fibular: Buf = { p: [], ix: [] };
+    const fibular: Buf = fresh();
     tube(fibular, chain([knee, down(hip, 500, s(22), -6), down(hip, 840, s(18), 4)], 5), mm(0.62));
-    const pudendal: Buf = { p: [], ix: [] };
+    const pudendal: Buf = fresh();
     tube(pudendal, chain([at(1.16, s(20), -6), at(1.22, s(12), -14), down(at(1.24, s(8), -10), 36)], 3), mm(0.45));
 
-    const vagus: Buf = { p: [], ix: [] };
+    const vagus: Buf = fresh();
     tube(vagus, chain([at(0.02, s(16), 22), at(0.12, s(20), 26), at(0.28, s(24), 30), at(0.46, s(18), 36)], 4), mm(0.55));
 
     const push = (buf: Buf, key: string, label: string, cat: CatId, blurb: string) => {

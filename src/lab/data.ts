@@ -238,7 +238,7 @@ export const CATEGORIES: CatMeta[] = [
     group: "Peripheral nervous system",
     blurb:
       "Thirty-one pairs. Dorsal and ventral roots meet at the dorsal root ganglion, then the mixed spinal nerve leaves toward its foramen. Cervical, thoracic, lumbar, sacral, and the coccygeal nerve are all here.",
-    color: "#e4b0a0",
+    color: "#e4a898",
     opacity: 1,
     visible: true,
     explode: 0.55,
@@ -251,7 +251,7 @@ export const CATEGORIES: CatMeta[] = [
     group: "Peripheral nervous system",
     blurb:
       "The plexuses and the nerves they form: phrenic, brachial plexus and its five terminal nerves, intercostals, lumbar plexus, femoral and obturator, sciatic, tibial, common fibular, and pudendal. Paths are life-sized and schematic, not a surgical plan.",
-    color: "#d7a090",
+    color: "#e4a898",
     opacity: 1,
     visible: true,
     explode: 0.7,
@@ -264,7 +264,7 @@ export const CATEGORIES: CatMeta[] = [
     group: "Peripheral nervous system",
     blurb:
       "The paired sympathetic chain, from the neck to the sacrum, with rami to the spinal nerves. Ganglia sit on the chain. This is the thoracolumbar outflow of the autonomic system.",
-    color: "#c47d78",
+    color: "#e4a898",
     opacity: 1,
     visible: true,
     explode: 0.35,

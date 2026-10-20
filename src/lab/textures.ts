@@ -55,7 +55,7 @@ const TUNING: Record<TextureKind, { scale: number; bump: number; alpha: number }
 };
 
 const cache = new Map<TextureKind, Pack>();
-const TEX_VERSION = 17;
+const TEX_VERSION = 18;
 
 function hash(ix: number, iy: number) {
   let n = Math.imul(ix, 374761393) + Math.imul(iy, 668265263);
@@ -270,15 +270,15 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     };
   }
   if (kind === "cranial_nerves") {
-    const fasc = Math.abs(fract(u * 7 + 0.12 * Math.sin(v * Math.PI * 2 * 3)) - 0.5) * 2;
-    const fiber = 0.5 + 0.5 * Math.sin((v * 36) * Math.PI * 2);
-    const edge = smooth(0.35, 0.9, fasc);
+    const fasc = Math.abs(fract(u * 9 + 0.08 * Math.sin(v * Math.PI * 6)) - 0.5) * 2;
+    const fiber = 0.5 + 0.5 * Math.sin(v * 48 * Math.PI * 2);
+    const edge = smooth(0.28, 0.86, fasc);
     return {
-      r: lerp(0.75, 1.06, edge) * lerp(0.96, 1.03, fiber),
-      g: lerp(0.72, 1.02, edge),
-      b: lerp(0.62, 0.92, edge),
-      rough: lerp(0.85, 0.4, fiber),
-      height: 0.15 + fasc * 0.7 + fiber * 0.1,
+      r: lerp(0.72, 0.94, edge) * lerp(0.96, 1.02, fiber),
+      g: lerp(0.66, 0.88, edge),
+      b: lerp(0.52, 0.74, edge),
+      rough: lerp(0.72, 0.38, fiber),
+      height: 0.18 + fasc * 0.62 + fiber * 0.08,
       mask: 1,
     };
   }
@@ -389,6 +389,8 @@ export function tissueTextures() {
   for (const pack of cache.values()) out.push(pack.alb, pack.surf);
   const cord = spinalTextures();
   out.push(cord.alb, cord.surf);
+  const nerve = nerveTextures();
+  out.push(nerve.alb, nerve.surf);
   return out;
 }
 
@@ -636,4 +638,77 @@ export function applySpinalUv(mat: THREE.MeshStandardMaterial) {
   mat.roughnessMap = pack.surf;
   mat.bumpMap = pack.surf;
   mat.bumpScale = 0.001;
+}
+
+const NERVE_U = 256;
+const NERVE_V = 512;
+let nerveTex: { alb: THREE.CanvasTexture; surf: THREE.CanvasTexture } | null = null;
+
+function shadeNerve(u: number, v: number): Ink {
+  const fasc = Math.pow(0.35 + 0.65 * Math.abs(Math.sin(u * Math.PI * 4)), 0.8);
+  const fiber = 0.5 + 0.5 * Math.sin((v * 42 + u * 1.6) * Math.PI * 2);
+  const vessel = smooth(0.012, 0.0018, wrapDist(u, 0.22 + 0.05 * Math.sin(v * Math.PI * 6)));
+  const vessel2 = smooth(0.008, 0.0014, wrapDist(u, 0.71 + 0.03 * Math.sin(v * Math.PI * 4 + 1.2)));
+  const blood = Math.max(vessel, vessel2 * 0.75);
+  let r = lerp(0.72, 0.94, fasc) * lerp(0.96, 1.02, fiber);
+  let g = lerp(0.66, 0.88, fasc) * lerp(0.97, 1.01, fiber);
+  let b = lerp(0.52, 0.74, fasc);
+  r = lerp(r, 0.62, blood);
+  g = lerp(g, 0.28, blood);
+  b = lerp(b, 0.24, blood);
+  return {
+    r,
+    g,
+    b,
+    rough: lerp(0.62, 0.32, fasc) * lerp(1, 0.86, fiber),
+    height: 0.28 + fasc * 0.55 + fiber * 0.06 + blood * 0.18,
+    mask: 1,
+  };
+}
+
+function nerveTextures() {
+  if (nerveTex) return nerveTex;
+  const alb = new Uint8ClampedArray(NERVE_U * NERVE_V * 4);
+  const surf = new Uint8ClampedArray(NERVE_U * NERVE_V * 4);
+  for (let y = 0; y < NERVE_V; y++) {
+    const v = y / NERVE_V;
+    for (let x = 0; x < NERVE_U; x++) {
+      const ink = shadeNerve(x / NERVE_U, v);
+      const i = (y * NERVE_U + x) * 4;
+      alb[i] = sat(ink.r) * 255;
+      alb[i + 1] = sat(ink.g) * 255;
+      alb[i + 2] = sat(ink.b) * 255;
+      alb[i + 3] = 255;
+      surf[i] = sat(ink.height) * 255;
+      surf[i + 1] = sat(ink.rough) * 255;
+      surf[i + 2] = 255;
+      surf[i + 3] = 255;
+    }
+  }
+  const albTex = toTexture(alb, NERVE_U, NERVE_V);
+  const surfTex = toTexture(surf, NERVE_U, NERVE_V);
+  albTex.wrapS = albTex.wrapT = THREE.RepeatWrapping;
+  surfTex.wrapS = surfTex.wrapT = THREE.RepeatWrapping;
+  nerveTex = { alb: albTex, surf: surfTex };
+  return nerveTex;
+}
+
+export function nerveMaterial(color: THREE.Color) {
+  const pack = nerveTextures();
+  const mat = new THREE.MeshPhysicalMaterial({
+    color,
+    roughness: 0.4,
+    metalness: 0.02,
+    map: pack.alb,
+    roughnessMap: pack.surf,
+    bumpMap: pack.surf,
+    bumpScale: 0.00035,
+    clearcoat: 0.14,
+    clearcoatRoughness: 0.46,
+    sheen: 0.16,
+    sheenColor: new THREE.Color("#e4a898"),
+    sheenRoughness: 0.55,
+    envMapIntensity: 0.1,
+  });
+  return mat;
 }

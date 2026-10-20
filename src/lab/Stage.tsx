@@ -19,7 +19,7 @@ import {
 } from "./data";
 import { useLab, type Axis, type Meta } from "./store";
 import { SCENARIO_BY_ID, circuitLinks, lostToCut, scenarioFocus, scenarioHit, type ModuleStop } from "./scenarios";
-import { applyRepeating, applySpinalUv, applyTriplanar, tissueTextures } from "./textures";
+import { applyRepeating, applySpinalUv, applyTriplanar, nerveMaterial, tissueTextures } from "./textures";
 import { buildPeripheral } from "./nerves";
 
 type Side = "left" | "right" | "median";
@@ -1428,7 +1428,7 @@ function buildSpinalCord(
   const ri: number[] = [];
   const addStrand = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, radius: number) => {
     const steps = 6;
-    const sides = 5;
+    const sides = 8;
     const base = rp.length / 3;
     const bez = (t: number) => {
       const u = 1 - t;
@@ -1919,8 +1919,8 @@ function Specimen() {
                 const nerveColor = (cat: CatId) => new THREE.Color(CAT_BY_ID[cat].color);
                 for (const part of buildPeripheral(origin, inferior, anterior, rightAxis, unitToMm)) {
                   const color = nerveColor(part.cat);
-                  const mat = makeMaterial("cranial_nerves", color, part.label.length + (part.side === "left" ? 5 : 11));
-                  mat.color.copy(color);
+                  const mat = nerveMaterial(color);
+                  mat.bumpScale = 0.45 / unitToMm;
                   const mesh = new THREE.Mesh(part.geo, mat);
                   mesh.userData.key = part.key;
                   gltf.scene.add(mesh);
