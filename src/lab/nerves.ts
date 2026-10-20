@@ -245,7 +245,72 @@ export function buildPeripheral(
     tube(pudendal, chain([at(1.16, s(20), -6), at(1.22, s(12), -14), down(at(1.24, s(8), -10), 36)], 3), mm(0.45));
 
     const vagus: Buf = fresh();
-    tube(vagus, chain([at(0.02, s(16), 22), at(0.12, s(20), 26), at(0.28, s(24), 30), at(0.46, s(18), 36)], 4), mm(0.55));
+    tube(vagus, chain([at(0.02, s(16), 22), at(0.12, s(20), 26), at(0.28, s(24), 30), at(0.46, s(18), 36), at(0.62, s(14), 42)], 4), mm(0.55));
+
+    const cervical: Buf = fresh();
+    for (const t of [0.03, 0.055, 0.08, 0.105]) tube(cervical, chain([at(t, s(26), 4), at(0.08, s(40), 20)], 3), mm(0.7));
+    const lesserOcc: Buf = fresh();
+    tube(lesserOcc, chain([at(0.07, s(40), 18), at(0.02, s(48), -8), at(-0.02, s(36), -20)], 3), mm(0.4));
+    const auricular: Buf = fresh();
+    tube(auricular, chain([at(0.08, s(40), 20), at(0.04, s(52), 16), at(0.0, s(46), 8)], 3), mm(0.42));
+    const supraclav: Buf = fresh();
+    tube(supraclav, chain([at(0.1, s(40), 16), at(0.16, s(70), 12), at(0.2, s(90), 6)], 3), mm(0.4));
+    const ansa: Buf = fresh();
+    tube(ansa, chain([at(0.06, s(28), 22), at(0.12, s(24), 30), at(0.18, s(30), 24)], 3), mm(0.36));
+
+    const longThoracic: Buf = fresh();
+    tube(longThoracic, chain([at(0.155, s(30), 8), at(0.24, s(70), 24), at(0.4, s(78), 30)], 4), mm(0.42));
+    const suprascap: Buf = fresh();
+    tube(suprascap, chain([at(0.155, s(30), 4), at(0.18, s(80), -16), shoulder.clone().addScaledVector(anterior, mm(-18))], 3), mm(0.45));
+    const thoracodorsal: Buf = fresh();
+    tube(thoracodorsal, chain([axilla, down(shoulder, 40, s(-10), -16), down(shoulder, 120, s(-6), -20)], 3), mm(0.42));
+
+    const lfc: Buf = fresh();
+    tube(lfc, chain([plexusPoint, at(0.9, s(110), 20), down(hip, 220, s(28), 16)], 4), mm(0.4));
+    const ilio: Buf = fresh();
+    tube(ilio, chain([at(0.6, s(26), 8), at(0.72, s(70), 36), at(0.84, s(40), 48)], 3), mm(0.38));
+    const genfem: Buf = fresh();
+    tube(genfem, chain([plexusPoint, at(0.82, s(36), 28), at(0.98, s(22), 34)], 3), mm(0.36));
+    const saphenous: Buf = fresh();
+    tube(saphenous, chain([down(hip, 200, s(4), 26), down(hip, 460, s(-10), 16), down(hip, 820, s(-16), 6)], 4), mm(0.38));
+
+    const sacral: Buf = fresh();
+    const sacralJoin = at(1.02, s(48), -8);
+    for (const t of [1.04, 1.1, 1.16, 1.22]) tube(sacral, chain([at(t, s(22), -4), sacralJoin], 3), mm(0.8));
+    const supGlut: Buf = fresh();
+    tube(supGlut, chain([sacralJoin, at(1.0, s(78), -24), hip.clone().addScaledVector(anterior, mm(-16))], 3), mm(0.48));
+    const infGlut: Buf = fresh();
+    tube(infGlut, chain([sacralJoin, at(1.08, s(70), -22), down(hip, 40, s(6), -24)], 3), mm(0.48));
+    const postCut: Buf = fresh();
+    tube(postCut, chain([sacralJoin, hip.clone().addScaledVector(anterior, mm(-18)), down(hip, 380, s(2), -22)], 4), mm(0.4));
+    const sural: Buf = fresh();
+    tube(sural, chain([down(hip, 480, s(8), -12), down(hip, 680, s(14), -8), down(hip, 860, s(10), -4)], 4), mm(0.36));
+    const supFib: Buf = fresh();
+    tube(supFib, chain([down(hip, 520, s(20), -2), down(hip, 700, s(24), 6), down(hip, 860, s(16), 10)], 4), mm(0.34));
+    const deepFib: Buf = fresh();
+    tube(deepFib, chain([down(hip, 520, s(16), 2), down(hip, 700, s(8), 8), down(hip, 860, s(4), 12)], 4), mm(0.34));
+
+    const greater: Buf = fresh();
+    tube(greater, chain([at(0.36, s(18), 8), at(0.44, s(14), 22), at(0.54, s(10), 40)], 4), mm(0.42));
+    const lesser: Buf = fresh();
+    tube(lesser, chain([at(0.48, s(18), 8), at(0.54, s(12), 24), at(0.6, s(8), 38)], 3), mm(0.36));
+    const least: Buf = fresh();
+    tube(least, chain([at(0.54, s(18), 8), at(0.6, s(12), 26)], 3), mm(0.32));
+    const pelvic: Buf = fresh();
+    for (const t of [1.1, 1.16, 1.22]) tube(pelvic, chain([at(t, s(16), 2), at(t + 0.02, s(8), 16)], 3), mm(0.32));
+
+    const trigem: Buf = fresh();
+    const ganglion = at(0.015, s(28), 18);
+    tube(trigem, chain([at(0.01, s(12), 8), ganglion], 3), mm(0.7), { swell: 0.9, swellAt: 0.85, taper: 1 });
+    tube(trigem, chain([ganglion, at(0.0, s(22), 42), at(-0.02, s(14), 58)], 3), mm(0.42));
+    tube(trigem, chain([ganglion, at(0.01, s(36), 40), at(0.0, s(42), 52)], 3), mm(0.45));
+    tube(trigem, chain([ganglion, at(0.03, s(40), 28), at(0.02, s(48), 36)], 3), mm(0.5));
+    const facial: Buf = fresh();
+    tube(facial, chain([at(0.02, s(14), 4), at(0.01, s(36), 16), at(-0.01, s(48), 22)], 3), mm(0.48));
+    const accessory: Buf = fresh();
+    tube(accessory, chain([at(0.02, s(10), -4), at(0.08, s(32), -12), at(0.16, s(55), -18), down(shoulder, 20, s(-8), -30)], 4), mm(0.46));
+    const hypoglossal: Buf = fresh();
+    tube(hypoglossal, chain([at(0.025, s(12), 10), at(0.02, s(24), 24), at(0.005, s(16), 32)], 3), mm(0.4));
 
     const push = (buf: Buf, key: string, label: string, cat: CatId, blurb: string) => {
       if (!buf.p.length) return;
@@ -268,7 +333,34 @@ export function buildPeripheral(
     push(tibial, "nerve:tibial", "Tibial nerve", "peripheral", "Posterior leg, toward the medial ankle.");
     push(fibular, "nerve:fibular", "Common fibular nerve", "peripheral", "Around the neck of the fibula and down the lateral leg.");
     push(pudendal, "nerve:pudendal", "Pudendal nerve", "peripheral", "S2–S4 to the perineum.");
-    push(vagus, "nerve:vagus", "Vagus nerve, cervical", "peripheral", "Continuation of cranial nerve X through the neck into the thorax.");
+    push(vagus, "nerve:vagus", "Vagus nerve, cervical", "peripheral", "Continuation of cranial nerve X through the neck into the thorax and upper abdomen.");
+    push(cervical, "nerve:cervical", "Cervical plexus", "peripheral", "Ventral rami of C1–C4, in the neck, before the cutaneous branches and the phrenic nerve leave.");
+    push(lesserOcc, "nerve:lesser-occipital", "Lesser occipital nerve", "peripheral", "Sensory branch of the cervical plexus to the skin behind the ear.");
+    push(auricular, "nerve:auricular", "Great auricular nerve", "peripheral", "Sensory branch of the cervical plexus to the skin over the parotid and the ear.");
+    push(supraclav, "nerve:supraclavicular", "Supraclavicular nerves", "peripheral", "Sensory branches of the cervical plexus to the skin over the clavicle and the shoulder.");
+    push(ansa, "nerve:ansa", "Ansa cervicalis", "peripheral", "Loop from C1–C3 that supplies the infrahyoid muscles.");
+    push(longThoracic, "nerve:long-thoracic", "Long thoracic nerve", "peripheral", "From C5–C7, on the chest wall, to serratus anterior.");
+    push(suprascap, "nerve:suprascapular", "Suprascapular nerve", "peripheral", "From the upper trunk of the brachial plexus to supraspinatus and infraspinatus.");
+    push(thoracodorsal, "nerve:thoracodorsal", "Thoracodorsal nerve", "peripheral", "From the posterior cord to latissimus dorsi.");
+    push(lfc, "nerve:lfc", "Lateral femoral cutaneous nerve", "peripheral", "From the lumbar plexus, under the inguinal ligament, to the skin of the lateral thigh.");
+    push(ilio, "nerve:ilioinguinal", "Iliohypogastric and ilioinguinal nerves", "peripheral", "From L1. They cross the abdominal wall and supply the skin above the inguinal ligament and the genitalia.");
+    push(genfem, "nerve:genitofemoral", "Genitofemoral nerve", "peripheral", "From L1–L2. It splits into genital and femoral branches on the anterior abdominal wall.");
+    push(saphenous, "nerve:saphenous", "Saphenous nerve", "peripheral", "Sensory continuation of the femoral nerve down the medial leg to the foot.");
+    push(sacral, "nerve:sacral", "Sacral plexus", "peripheral", "Ventral rami of L4–S4, on the posterior pelvic wall, before the sciatic and gluteal nerves leave.");
+    push(supGlut, "nerve:sup-gluteal", "Superior gluteal nerve", "peripheral", "Leaves the sacral plexus above piriformis to gluteus medius, gluteus minimus, and tensor fasciae latae.");
+    push(infGlut, "nerve:inf-gluteal", "Inferior gluteal nerve", "peripheral", "Leaves the sacral plexus below piriformis to gluteus maximus.");
+    push(postCut, "nerve:post-cutaneous", "Posterior femoral cutaneous nerve", "peripheral", "Sensory nerve from the sacral plexus down the posterior thigh.");
+    push(sural, "nerve:sural", "Sural nerve", "peripheral", "Sensory nerve formed from tibial and fibular contributions, behind the lateral ankle.");
+    push(supFib, "nerve:sup-fibular", "Superficial fibular nerve", "peripheral", "Division of the common fibular nerve to the lateral compartment of the leg and the dorsum of the foot.");
+    push(deepFib, "nerve:deep-fibular", "Deep fibular nerve", "peripheral", "Division of the common fibular nerve to the anterior compartment and the skin between the first two toes.");
+    push(greater, "nerve:greater-splanchnic", "Greater splanchnic nerve", "sympathetic", "Sympathetic fibers from about T5–T9, leaving the trunk to reach the celiac ganglion.");
+    push(lesser, "nerve:lesser-splanchnic", "Lesser splanchnic nerve", "sympathetic", "Sympathetic fibers from about T10–T11 to the superior mesenteric ganglion.");
+    push(least, "nerve:least-splanchnic", "Least splanchnic nerve", "sympathetic", "Sympathetic fibers from T12 to the aorticorenal ganglion.");
+    push(pelvic, "nerve:pelvic-splanchnic", "Pelvic splanchnic nerves", "peripheral", "Parasympathetic outflow from S2–S4 to the pelvic organs. Not part of the sympathetic trunk.");
+    push(trigem, "nerve:trigeminal", "Trigeminal nerve, extracranial", "peripheral", "The trigeminal ganglion and the three divisions, ophthalmic, maxillary, and mandibular, just beyond the skull.");
+    push(facial, "nerve:facial", "Facial nerve, extracranial", "peripheral", "Cranial nerve VII after it leaves the stylomastoid foramen, before it divides on the face.");
+    push(accessory, "nerve:accessory", "Accessory nerve", "peripheral", "Cranial nerve XI crossing the neck to sternocleidomastoid and trapezius.");
+    push(hypoglossal, "nerve:hypoglossal", "Hypoglossal nerve", "peripheral", "Cranial nerve XII, looping toward the tongue.");
   }
   return parts;
 }

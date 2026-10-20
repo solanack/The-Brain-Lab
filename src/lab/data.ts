@@ -435,6 +435,56 @@ const PEARLS: Record<string, string> = {
     "The sympathetic trunk is a chain of ganglia on either side of the vertebral column. White and gray rami connect it to the spinal nerves.",
   vagus:
     "Cranial nerve X continues past the skull through the neck and the thorax. It is the main parasympathetic supply to the organs of the chest and abdomen.",
+  "cervical plexus":
+    "Ventral rami of C1–C4. Cutaneous branches supply the neck and the scalp behind the ear. The phrenic nerve is its motor continuation to the diaphragm.",
+  "lesser occipital":
+    "Sensory branch of the cervical plexus. It supplies skin on the side of the head, behind the ear.",
+  "great auricular":
+    "The largest cutaneous branch of the cervical plexus. It supplies skin over the parotid and the ear.",
+  supraclavicular:
+    "Medial, intermediate, and lateral supraclavicular nerves. They supply skin over the clavicle and the upper chest.",
+  "ansa cervicalis":
+    "A loop of C1–C3 fibers on the carotid sheath. It supplies the infrahyoid strap muscles.",
+  "long thoracic":
+    "From C5–C7, on the surface of serratus anterior. Injury wings the scapula.",
+  suprascapular:
+    "From the upper trunk. It passes through the suprascapular notch to supraspinatus and infraspinatus.",
+  thoracodorsal:
+    "From the posterior cord. It supplies latissimus dorsi.",
+  "lateral femoral":
+    "Purely sensory, from L2–L3. It enters the thigh under the lateral inguinal ligament. Compression here is meralgia paresthetica.",
+  iliohypogastric:
+    "From L1. It supplies the skin above the pubis and the lower abdominal wall.",
+  genitofemoral:
+    "From L1–L2. The genital branch enters the inguinal canal. The femoral branch supplies skin over the femoral triangle.",
+  saphenous:
+    "The terminal sensory branch of the femoral nerve. It follows the great saphenous vein to the medial foot.",
+  "sacral plexus":
+    "L4–S4, on the piriformis. It forms the sciatic nerve and the gluteal, pudendal, and posterior cutaneous nerves.",
+  "superior gluteal":
+    "L4–S1. It leaves the pelvis above piriformis and supplies gluteus medius, gluteus minimus, and tensor fasciae latae.",
+  "inferior gluteal":
+    "L5–S2. It leaves below piriformis and supplies gluteus maximus.",
+  "posterior femoral":
+    "Sensory nerve to the skin of the posterior thigh and the popliteal fossa.",
+  sural:
+    "A sensory nerve on the back of the leg, usually joined by contributions from the tibial and common fibular nerves.",
+  "superficial fibular":
+    "Supplies the fibularis muscles and most of the skin on the dorsum of the foot.",
+  "deep fibular":
+    "Supplies tibialis anterior and the toe extensors, then the skin of the first web space.",
+  "greater splanchnic":
+    "Preganglionic sympathetic fibers from about T5–T9. They pierce the diaphragm and synapse in the celiac ganglion.",
+  "lesser splanchnic":
+    "Preganglionic sympathetic fibers from about T10–T11 to the superior mesenteric ganglion.",
+  "least splanchnic":
+    "The smallest thoracic splanchnic nerve, usually from T12, to the aorticorenal ganglion.",
+  "pelvic splanchnic":
+    "Parasympathetic fibers from S2–S4. They are the sacral outflow to the hindgut and the pelvic organs.",
+  trigeminal:
+    "The trigeminal ganglion sits in Meckel’s cave. Distal to it the nerve is three divisions: ophthalmic, maxillary, and mandibular.",
+  hypoglossal:
+    "Cranial nerve XII. It leaves the hypoglossal canal and runs forward to the muscles of the tongue.",
   midbrain:
     "Mesencephalon: cerebral peduncles, substantia nigra, tegmentum, and the colliculi, with the aqueduct between tectum and tegmentum.",
   pons: "Ventral pons is a mass of pontine nuclei and transverse fibers entering the middle cerebellar peduncles. The tegmentum keeps the cranial-nerve nuclei.",
@@ -479,17 +529,17 @@ const PEARLS: Record<string, string> = {
   "abducens nerve":
     "Cranial nerve VI. It reaches only the lateral rectus. This specimen stops at that muscle.",
   "trigeminal nerve":
-    "Cranial nerve V. The three divisions leave the skull. The face beyond those branches is not shown.",
+    "Cranial nerve V. The ganglion and the ophthalmic, maxillary, and mandibular divisions continue a short way beyond the skull.",
   "facial nerve":
-    "Cranial nerve VII leaves through the temporal bone. The muscles of the face are not shown.",
+    "Cranial nerve VII after the stylomastoid foramen, before the facial muscles, which are not shown.",
   "vestibular nerve":
     "Part of cranial nerve VIII. It ends at the internal acoustic meatus in this specimen. The ear is not shown.",
   "vagus nerve":
-    "Cranial nerve X leaves through the jugular foramen. The neck and the organs are not shown.",
+    "Cranial nerve X leaves through the jugular foramen and continues through the neck into the thorax.",
   "accessory nerve":
-    "Cranial nerve XI leaves through the jugular foramen. The sternocleidomastoid and trapezius are not shown.",
+    "Cranial nerve XI crosses the posterior triangle toward sternocleidomastoid and trapezius. Those muscles are not shown.",
   "hypoglossal nerve":
-    "Cranial nerve XII leaves through the hypoglossal canal. The tongue is not shown.",
+    "Cranial nerve XII leaves the hypoglossal canal and runs forward. The tongue is not shown.",
 };
 
 const PEARL_LIST = Object.entries(PEARLS).sort((a, b) => b[0].length - a[0].length);
