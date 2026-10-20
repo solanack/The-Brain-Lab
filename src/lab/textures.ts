@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { CatId } from "./data";
 
-export type TextureKind = Exclude<CatId, "spinal_cord"> | "cell" | "ecm";
+export type TextureKind = Exclude<CatId, "spinal_cord" | "spinal_nerves" | "peripheral" | "sympathetic"> | "cell" | "ecm";
 
 type Pack = {
   alb: THREE.CanvasTexture;
@@ -35,7 +35,7 @@ const KINDS: TextureKind[] = [
 
 const TUNING: Record<TextureKind, { scale: number; bump: number; alpha: number }> = {
   dura: { scale: 16, bump: 6.5, alpha: 0.48 },
-  arachnoid: { scale: 26, bump: 5.5, alpha: 0.7 },
+  arachnoid: { scale: 34, bump: 9, alpha: 0.72 },
   meninges_dura: { scale: 13, bump: 5, alpha: 0 },
   cortex: { scale: 46, bump: 4.2, alpha: 0 },
   white_matter: { scale: 30, bump: 2.5, alpha: 0 },
@@ -55,7 +55,7 @@ const TUNING: Record<TextureKind, { scale: number; bump: number; alpha: number }
 };
 
 const cache = new Map<TextureKind, Pack>();
-const TEX_VERSION = 13;
+const TEX_VERSION = 17;
 
 function hash(ix: number, iy: number) {
   let n = Math.imul(ix, 374761393) + Math.imul(iy, 668265263);
@@ -122,9 +122,9 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const open = Math.min(vein, cap);
     const base = lerp(0.58, 0.72, blot);
     return {
-      r: Math.min(0.8, base * lerp(0.78, 1, open)),
-      g: Math.min(0.72, base * lerp(0.6, 0.88, open) * lerp(0.98, 1.02, pores)),
-      b: Math.min(0.66, base * lerp(0.55, 0.82, open)),
+      r: Math.min(0.78, base * lerp(0.78, 1, open)),
+      g: Math.min(0.7, base * lerp(0.6, 0.88, open) * lerp(0.98, 1.02, pores)),
+      b: Math.min(0.64, base * lerp(0.55, 0.82, open)),
       rough: lerp(0.7, 0.4, open),
       height: 0.66 + (pores - 0.5) * 0.06 - (1 - vein) * 0.2 - (1 - cap) * 0.08,
       mask: 1,
@@ -223,9 +223,9 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const stain = fbm(pu + 0.2, pv + 0.5, 3, 3);
     const ridge = fbm(pu, pv, 2, 3);
     return {
-      r: lerp(0.78, 1.08, stain) * lerp(0.86, 1.05, weave),
-      g: lerp(0.76, 1.04, stain) * lerp(0.84, 1.02, weave),
-      b: lerp(0.7, 0.96, stain) * lerp(0.8, 0.98, weave),
+      r: lerp(0.62, 0.8, stain) * lerp(0.9, 1, weave),
+      g: lerp(0.5, 0.68, stain) * lerp(0.88, 0.98, weave),
+      b: lerp(0.46, 0.62, stain) * lerp(0.86, 0.96, weave),
       rough: lerp(0.95, 0.55, weave),
       height: 0.12 + weave * 0.5 + ridge * 0.38,
       mask: 0.25 + weave * 0.75,
@@ -234,13 +234,12 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
   if (kind === "arachnoid") {
     const web = Math.abs(fbm(pu, pv, 9, 4) - 0.5);
     const strand = 1 - smooth(0.015, 0.08, web);
-    const film = fbm(pu + 0.4, pv, 3, 2);
     return {
-      r: lerp(0.92, 1.12, strand) * lerp(0.96, 1.04, film),
-      g: lerp(0.94, 1.14, strand),
-      b: lerp(0.96, 1.16, strand),
-      rough: lerp(0.55, 0.18, strand),
-      height: 0.35 + strand * 0.6,
+      r: lerp(0.42, 0.94, strand),
+      g: lerp(0.3, 0.72, strand),
+      b: lerp(0.26, 0.64, strand),
+      rough: lerp(0.88, 0.48, strand),
+      height: 0.12 + strand * 0.84,
       mask: sat(strand),
     };
   }
@@ -304,6 +303,18 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
       b: lerp(0.55, 0.82, grain),
       rough: lerp(0.72, 0.4, fiber),
       height: 0.3 + fiber * 0.45 + grain * 0.16,
+      mask: 1,
+    };
+  }
+  if (kind === "cell") {
+    const grain = fbm(pu, pv, 10, 3);
+    const membrane = fbm(pu + 0.3, pv, 5, 3);
+    return {
+      r: Math.min(0.76, lerp(0.6, 0.74, membrane)),
+      g: Math.min(0.62, lerp(0.46, 0.6, membrane) * lerp(0.96, 1.02, grain)),
+      b: Math.min(0.56, lerp(0.42, 0.54, membrane)),
+      rough: lerp(0.74, 0.92, grain),
+      height: 0.45 + (membrane - 0.5) * 0.18,
       mask: 1,
     };
   }
@@ -394,6 +405,7 @@ uniform float uClose;
 uniform float uAniso;
 uniform float uScatter;
 uniform float uDetail;
+uniform float uPink;
 vec3 gSurf;
 vec3 gBlend;
 vec3 gP;
@@ -420,6 +432,7 @@ function compileTriplanar(shader: { vertexShader: string; fragmentShader: string
   shader.uniforms.uAniso = { value: 0 };
   shader.uniforms.uScatter = { value: 0 };
   shader.uniforms.uDetail = { value: 1 };
+  shader.uniforms.uPink = { value: 0 };
   shader.uniforms.uFiber = { value: new THREE.Vector3(0, 1, 0) };
   shader.uniforms.uPulse = { value: 0 };
   shader.uniforms.uDisplace = { value: 0 };
@@ -464,10 +477,17 @@ vFiber = mat3(modelMatrix) * uFiber;`,
     vec3 hi = triRgb(tAlb, gP * 2.5, gBlend);
     alb = mix(alb, alb * (0.84 + hi * 0.22), uClose * 0.7);
   }
-  diffuseColor.rgb *= alb * 0.72;
+  alb = min(alb, vec3(0.78));
+  float veil = step(0.6, uAlpha);
+  alb = mix(alb, triRgb(tAlb, gP, gBlend), veil);
+  diffuseColor.rgb *= alb * mix(0.7, 1.0, veil);
   gCavity = smoothstep(0.55, 0.28, gSurf.r);
-  diffuseColor.rgb *= mix(vec3(1.0), vec3(0.82, 0.74, 0.7), gCavity * 0.45);
+  diffuseColor.rgb *= mix(vec3(1.0), vec3(0.82, 0.74, 0.7), gCavity * 0.45 * (1.0 - veil));
   diffuseColor.a *= mix(1.0, mix(1.0 - uAlpha, 1.0, gSurf.b), uDetail);
+  if (uPink > 0.5) {
+    float tone = clamp(0.82 + alb.r * 0.18, 0.82, 1.0);
+    diffuseColor.rgb = vec3(0.66, 0.37, 0.30) * tone;
+  }
 }`,
     )
     .replace(
@@ -508,6 +528,7 @@ vFiber = mat3(modelMatrix) * uFiber;`,
   float wrap = pow(clamp(dot(normal, vec3(0.15, 0.95, 0.25)) * 0.55 + 0.45, 0.0, 1.0), 1.5);
   outgoingLight += vec3(0.42, 0.18, 0.14) * wrap * uScatter * (0.012 + gShade * 0.012);
   outgoingLight *= mix(vec3(1.0), vec3(0.9, 0.84, 0.8), gShade * 0.16);
+  outgoingLight = min(outgoingLight, diffuseColor.rgb * 1.15 + vec3(0.02));
 }`,
     );
 }
@@ -516,13 +537,14 @@ export function applyTriplanar(mat: THREE.Material, kind: TextureKind) {
   ensureTextures();
   const pack = cache.get(kind);
   if (!pack) return;
-  mat.customProgramCacheKey = () => "neurotome-triplanar-v13";
+  mat.customProgramCacheKey = () => "neurotome-triplanar-v19";
   mat.onBeforeCompile = (shader) => {
     compileTriplanar(shader, pack);
     const fiber = mat.userData.fiber as THREE.Vector3 | undefined;
     if (fiber) (shader.uniforms.uFiber.value as THREE.Vector3).copy(fiber);
     shader.uniforms.uAniso.value = (mat.userData.aniso as number) ?? 0;
     shader.uniforms.uScatter.value = (mat.userData.scatter as number) ?? 0;
+    shader.uniforms.uPink.value = (mat.userData.pink as number) ?? 0;
     mat.userData.tri = shader.uniforms;
   };
 }

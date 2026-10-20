@@ -14,6 +14,9 @@ export const CAT_IDS = [
   "arteries",
   "veins_sinuses",
   "cranial_nerves",
+  "spinal_nerves",
+  "peripheral",
+  "sympathetic",
   "globe",
   "orbit",
 ] as const;
@@ -41,7 +44,7 @@ export const CATEGORIES: CatMeta[] = [
     blurb:
       "Outer fibrous sac, derived from this specimen’s silhouette. Dense irregular connective tissue, pain-sensitive, continuous with the falx and the tentorium. Retract it to open the field.",
     color: "#c2b39a",
-    opacity: 0.2,
+    opacity: 0,
     visible: true,
     explode: 2.4,
     rough: 0.72,
@@ -53,8 +56,8 @@ export const CATEGORIES: CatMeta[] = [
     group: "Meninges",
     blurb:
       "The arachnoid bridges sulci. This shell is the outer wall of the subarachnoid space: cerebrospinal fluid and the larger vessels run deep to it, while pia stays on the gyri.",
-    color: "#d4e3e4",
-    opacity: 0.14,
+    color: "#e7c4bc",
+    opacity: 0,
     visible: true,
     explode: 1.8,
     rough: 0.18,
@@ -79,7 +82,7 @@ export const CATEGORIES: CatMeta[] = [
     group: "Telencephalon",
     blurb:
       "Neocortex folded into gyri and sulci, plus archicortex (hippocampus). Six layers are not separate shells in a real brain — open a tissue window on a gyrus to study the ribbon in place.",
-    color: "#c9a394",
+    color: "#d4a394",
     opacity: 1,
     visible: true,
     explode: 0.72,
@@ -230,6 +233,45 @@ export const CATEGORIES: CatMeta[] = [
     transparent: false,
   },
   {
+    id: "spinal_nerves",
+    label: "Spinal nerves",
+    group: "Peripheral nervous system",
+    blurb:
+      "Thirty-one pairs. Dorsal and ventral roots meet at the dorsal root ganglion, then the mixed spinal nerve leaves toward its foramen. Cervical, thoracic, lumbar, sacral, and the coccygeal nerve are all here.",
+    color: "#e4b0a0",
+    opacity: 1,
+    visible: true,
+    explode: 0.55,
+    rough: 0.48,
+    transparent: false,
+  },
+  {
+    id: "peripheral",
+    label: "Named peripheral nerves",
+    group: "Peripheral nervous system",
+    blurb:
+      "The plexuses and the nerves they form: phrenic, brachial plexus and its five terminal nerves, intercostals, lumbar plexus, femoral and obturator, sciatic, tibial, common fibular, and pudendal. Paths are life-sized and schematic, not a surgical plan.",
+    color: "#d7a090",
+    opacity: 1,
+    visible: true,
+    explode: 0.7,
+    rough: 0.46,
+    transparent: false,
+  },
+  {
+    id: "sympathetic",
+    label: "Sympathetic trunk",
+    group: "Peripheral nervous system",
+    blurb:
+      "The paired sympathetic chain, from the neck to the sacrum, with rami to the spinal nerves. Ganglia sit on the chain. This is the thoracolumbar outflow of the autonomic system.",
+    color: "#c47d78",
+    opacity: 1,
+    visible: true,
+    explode: 0.35,
+    rough: 0.5,
+    transparent: false,
+  },
+  {
     id: "globe",
     label: "Globe",
     group: "Orbit & visual pathway",
@@ -261,7 +303,7 @@ export const CAT_BY_ID: Record<CatId, CatMeta> = Object.fromEntries(
   CATEGORIES.map((c) => [c.id, c]),
 ) as Record<CatId, CatMeta>;
 
-export const GROUPS = ["Meninges", "Telencephalon", "Deep gray", "Fluid spaces", "Stem & cerebellum", "Vessels & nerves", "Orbit & visual pathway"];
+export const GROUPS = ["Meninges", "Telencephalon", "Deep gray", "Fluid spaces", "Stem & cerebellum", "Vessels & nerves", "Peripheral nervous system", "Orbit & visual pathway"];
 
 const PEARLS: Record<string, string> = {
   "precentral gyrus":
@@ -357,6 +399,42 @@ const PEARLS: Record<string, string> = {
     "Lumbar and sacral rootlets that have already left the cord and keep descending inside the lumbar cistern to their exit foramina. The cord itself has ended.",
   "rootlets":
     "Ventral rootlets leave the anterolateral sulcus, dorsal rootlets the posterolateral sulcus. They stay paired and become longer as the segments descend.",
+  "spinal nerves":
+    "Each spinal nerve is mixed. The dorsal root ganglion sits just distal to the junction of dorsal and ventral roots. There are 8 cervical, 12 thoracic, 5 lumbar, 5 sacral, and 1 coccygeal pair.",
+  phrenic:
+    "The phrenic nerve is the main motor supply of the diaphragm. It is formed from C3–C5 and descends through the neck and the mediastinum.",
+  "brachial plexus":
+    "Ventral rami of C5–T1. Roots, trunks, divisions, and cords sit between the neck and the axilla, then form the nerves of the upper limb.",
+  "median nerve":
+    "From the medial and lateral cords. It runs the anterior arm and forearm and supplies most of the forearm flexors and the thenar muscles.",
+  "ulnar nerve":
+    "From the medial cord. It passes behind the medial epicondyle and supplies the intrinsic hand muscles and the medial hand.",
+  "radial nerve":
+    "From the posterior cord. It wraps the humerus in the spiral groove and supplies the extensors of the elbow, wrist, and fingers.",
+  musculocutaneous:
+    "From the lateral cord. It supplies coracobrachialis, biceps, and brachialis, then continues as the lateral cutaneous nerve of the forearm.",
+  axillary:
+    "From the posterior cord. A short nerve around the surgical neck of the humerus to deltoid and teres minor.",
+  intercostal:
+    "Ventral rami of the thoracic nerves. They run in the costal groove and supply the intercostal muscles and the skin of the trunk.",
+  "lumbar plexus":
+    "Ventral rami of L1–L4, in the psoas. It forms the femoral, obturator, and lateral femoral cutaneous nerves.",
+  femoral:
+    "The femoral nerve leaves the lumbar plexus and passes under the inguinal ligament into the anterior thigh. It supplies the quadriceps and the skin of the anterior thigh.",
+  obturator:
+    "From the lumbar plexus, through the obturator canal, to the medial thigh adductors.",
+  sciatic:
+    "The largest nerve, from the sacral plexus (L4–S3). It leaves the pelvis through the greater sciatic foramen and runs down the posterior thigh.",
+  tibial:
+    "The tibial division of the sciatic nerve stays posterior in the leg and enters the foot behind the medial malleolus.",
+  fibular:
+    "The common fibular division winds around the neck of the fibula. A common site of compression.",
+  pudendal:
+    "From S2–S4. It leaves the pelvis and supplies the perineum and the external anal and urethral sphincters.",
+  sympathetic:
+    "The sympathetic trunk is a chain of ganglia on either side of the vertebral column. White and gray rami connect it to the spinal nerves.",
+  vagus:
+    "Cranial nerve X continues past the skull through the neck and the thorax. It is the main parasympathetic supply to the organs of the chest and abdomen.",
   midbrain:
     "Mesencephalon: cerebral peduncles, substantia nigra, tegmentum, and the colliculi, with the aqueduct between tectum and tegmentum.",
   pons: "Ventral pons is a mass of pontine nuclei and transverse fibers entering the middle cerebellar peduncles. The tegmentum keeps the cranial-nerve nuclei.",
@@ -475,7 +553,7 @@ export const RECIPES: Recipe[] = [
       { name: "I · Molecular", tint: "#f0c8bc", from: 0.92, to: 1, cells: "glia", count: 6 },
       { name: "II · External granular", tint: "#e4c8ba", from: 0.82, to: 0.92, cells: "small-pyramid", count: 10 },
       { name: "III · External pyramidal", tint: "#d7b0a2", from: 0.66, to: 0.82, cells: "pyramid", count: 10 },
-      { name: "IV · Granular + Gennari", tint: "#e7d7b0", from: 0.4, to: 0.66, cells: "granule", count: 26 },
+      { name: "IV · Granular + Gennari", tint: "#e4c4b0", from: 0.4, to: 0.66, cells: "granule", count: 26 },
       { name: "V · Internal pyramidal", tint: "#c48478", from: 0.24, to: 0.4, cells: "pyramid", count: 8 },
       { name: "VI · Multiform", tint: "#b89088", from: 0.08, to: 0.24, cells: "fusiform", count: 8 },
     ],

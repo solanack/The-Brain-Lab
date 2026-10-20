@@ -20,6 +20,7 @@ import {
 import { useLab, type Axis, type Meta } from "./store";
 import { SCENARIO_BY_ID, circuitLinks, lostToCut, scenarioFocus, scenarioHit, type ModuleStop } from "./scenarios";
 import { applyRepeating, applySpinalUv, applyTriplanar, tissueTextures } from "./textures";
+import { buildPeripheral } from "./nerves";
 
 type Side = "left" | "right" | "median";
 
@@ -161,6 +162,9 @@ function parcelColor(cat: CatId, index: number) {
     arteries: [0.99, 1.02],
     veins_sinuses: [0.58, 0.67],
     cranial_nerves: [0.1, 0.15],
+    spinal_nerves: [0.02, 0.05],
+    peripheral: [0.03, 0.06],
+    sympathetic: [0.98, 1.02],
     globe: [0.04, 0.08],
     orbit: [0.01, 0.04],
   };
@@ -244,18 +248,17 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
       mat.roughness = 0.36;
     }
     if (cat === "arachnoid") {
-      phys.iridescence = 0.14;
-      phys.iridescenceIOR = 1.36;
-      phys.iridescenceThicknessRange = [80, 280];
-      phys.roughness = 0.18;
-      phys.clearcoat = 0.35;
-      phys.clearcoatRoughness = 0.22;
-      phys.transmission = 0.04;
-      phys.thickness = 0.00035;
-      phys.ior = 1.38;
-      phys.attenuationDistance = 0.008;
-      phys.attenuationColor = new THREE.Color("#e4eef2");
-      mat.roughness = 0.18;
+      phys.iridescence = 0;
+      phys.clearcoat = 0;
+      phys.sheen = 0.16;
+      phys.sheenRoughness = 0.62;
+      phys.sheenColor.set("#e8a090");
+      phys.transmission = 0;
+      phys.roughness = 0.58;
+      phys.envMapIntensity = 0;
+      mat.roughness = 0.58;
+      mat.metalness = 0;
+      mat.color.set("#e8a898");
     }
     if (cat === "globe") {
       phys.roughness = 0.38;
@@ -273,9 +276,9 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
     }
   }
   if (cat === "white_matter" || cat === "tracts") {
-    mat.roughness = 0.82;
+    mat.roughness = 0.92;
     mat.metalness = 0;
-    mat.envMapIntensity = 0.02;
+    mat.envMapIntensity = 0;
   }
   mat.userData.rough0 = mat.roughness;
   mat.userData.coat0 = (mat as THREE.MeshPhysicalMaterial).clearcoat ?? 0;
@@ -288,13 +291,29 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
     mat.polygonOffsetUnits = -2;
   }
   if (cat === "spinal_cord") applySpinalUv(mat);
-  else applyTriplanar(mat, cat);
+  else applyTriplanar(mat, cat === "spinal_nerves" || cat === "peripheral" || cat === "sympathetic" ? "cranial_nerves" : cat);
   mat.color.set(CAT_BY_ID[cat].color);
-  if (cat === "cortex") mat.color.set("#c9a394");
+  if (cat === "cortex") mat.color.set("#d4a394");
   if (cat === "white_matter") mat.color.set("#e8a898");
   if (cat === "tracts") mat.color.set("#e39d94");
   if (cat === "globe") mat.color.set("#f0d0c8");
   if (cat === "orbit") mat.color.set("#8f4e44");
+  if (cat === "cortex" || cat === "cerebellum") {
+    const phys = mat as THREE.MeshPhysicalMaterial;
+    mat.emissive.set(0x000000);
+    mat.emissiveIntensity = 0;
+    phys.clearcoat = 0;
+    phys.sheen = 0;
+    phys.iridescence = 0;
+    phys.transmission = 0;
+    mat.envMapIntensity = 0;
+    mat.roughness = 0.72;
+    mat.metalness = 0;
+    mat.userData.rough0 = 0.72;
+    mat.userData.coat0 = 0;
+    mat.userData.scatter = 0;
+    mat.userData.pink = 1;
+  }
   specimen.copy(mat.color);
   return mat;
 }
@@ -509,6 +528,13 @@ function cellScale(kind: Stratum["cells"], betz: boolean) {
   return { soma: 0.0005, cone: 0, coneH: 0 };
 }
 
+function pinTissue(mat: THREE.MeshStandardMaterial, roughness = 0.78) {
+  mat.envMapIntensity = 0;
+  mat.metalness = 0;
+  mat.roughness = roughness;
+  mat.roughnessMap = null;
+}
+
 function buildTissue(recipe: Recipe) {
   const H = 0.016;
   const W = 0.013;
@@ -517,8 +543,9 @@ function buildTissue(recipe: Recipe) {
   root.name = `tissue-${recipe.id}`;
   const rnd = mulberry32(recipe.id === "m1" ? 11 : recipe.id === "v1" ? 29 : recipe.id === "cb" ? 47 : 71);
   const layers: THREE.Group[] = [];
-  const axonMat = new THREE.MeshStandardMaterial({ color: "#e8a898", roughness: 0.45, metalness: 0.02 });
+  const axonMat = new THREE.MeshStandardMaterial({ color: "#e8a898", roughness: 0.78, metalness: 0 });
   applyRepeating(axonMat, "white_matter", 0.00005, 3);
+  pinTissue(axonMat, 0.8);
   const capMat = new THREE.MeshStandardMaterial({
     color: "#a33b3e",
     roughness: 0.35,
@@ -549,23 +576,26 @@ function buildTissue(recipe: Recipe) {
       roughness: 0.6,
     });
     applyRepeating(slabMat, "ecm", 0.00025, 2);
+    pinTissue(slabMat, 0.86);
     const slab = new THREE.Mesh(new THREE.BoxGeometry(W, height, D), slabMat);
     slab.position.y = mid;
     slab.renderOrder = 1;
     layer.add(slab);
 
     if (stratum.cells !== "none" && stratum.count > 0) {
-      const somaMat = new THREE.MeshStandardMaterial({ color: "#f0c2b6", roughness: 0.45 });
-      const coneMat = new THREE.MeshStandardMaterial({ color: "#e8b0a4", roughness: 0.55 });
+      const somaMat = new THREE.MeshStandardMaterial({ color: "#c48b80", roughness: 0.78 });
+      const coneMat = new THREE.MeshStandardMaterial({ color: "#b88880", roughness: 0.8 });
       applyRepeating(somaMat, "cell", 0.00012, 2);
       applyRepeating(coneMat, "cell", 0.00008, 2);
+      pinTissue(somaMat, 0.78);
+      pinTissue(coneMat, 0.82);
       const soma = new THREE.InstancedMesh(UNIT.soma, somaMat, stratum.count);
       const cones = new THREE.InstancedMesh(UNIT.cone, coneMat, stratum.count);
       const dummy = new THREE.Object3D();
       const somaColor = new THREE.Color(
-        stratum.cells === "granule" ? "#d7c094" : stratum.cells === "glia" ? "#ddd0c2" : stratum.cells === "purkinje" ? "#a86a5c" : "#c48b80",
+        stratum.cells === "granule" ? "#c4a078" : stratum.cells === "glia" ? "#c4a090" : stratum.cells === "purkinje" ? "#a86a5c" : "#c48b80",
       );
-      const dendColor = somaColor.clone().offsetHSL(0, -0.05, 0.06);
+      const dendColor = somaColor.clone().offsetHSL(0, -0.02, 0.02);
       for (let i = 0; i < stratum.count; i++) {
         const betz = stratum.cells === "betz" && i % 3 === 0;
         const size = cellScale(stratum.cells, betz);
@@ -629,6 +659,7 @@ function buildTissue(recipe: Recipe) {
     roughness: 0.9,
   });
   applyRepeating(ecmMat, "ecm", 0.0002, 3);
+  pinTissue(ecmMat, 0.9);
   const ecm = new THREE.Mesh(new THREE.BoxGeometry(W * 1.02, H, D * 1.02), ecmMat);
   ecm.position.y = H / 2;
   ecm.renderOrder = 0;
@@ -962,6 +993,9 @@ function visualTarget(rec: Rec, frame: Frame, explode: number, retract: number, 
     case "arteries":
     case "veins_sinuses":
     case "cranial_nerves":
+    case "spinal_nerves":
+    case "peripheral":
+    case "sympathetic":
       out.addScaledVector(rec.dir, e * rec.weight * md * 0.5);
       out.addScaledVector(frame.superior, e * md * 0.14);
       if (rec.side === "left") out.addScaledVector(frame.right, -e * md * 0.24);
@@ -1882,6 +1916,44 @@ function Specimen() {
                     blurb,
                   });
                 }
+                const nerveColor = (cat: CatId) => new THREE.Color(CAT_BY_ID[cat].color);
+                for (const part of buildPeripheral(origin, inferior, anterior, rightAxis, unitToMm)) {
+                  const color = nerveColor(part.cat);
+                  const mat = makeMaterial("cranial_nerves", color, part.label.length + (part.side === "left" ? 5 : 11));
+                  mat.color.copy(color);
+                  const mesh = new THREE.Mesh(part.geo, mat);
+                  mesh.userData.key = part.key;
+                  gltf.scene.add(mesh);
+                  const specimen = color.clone();
+                  records.push({
+                    key: part.key,
+                    mesh,
+                    mat: mat as THREE.MeshStandardMaterial,
+                    cat: part.cat,
+                    side: part.side,
+                    label: part.label,
+                    region: "Peripheral nervous system",
+                    hay: `${part.label} ${part.side} spinal nerve plexus sympathetic vagus`.toLowerCase(),
+                    restCenter: meshCenter(mesh),
+                    restPosition: mesh.position.clone(),
+                    dir: inferior.clone(),
+                    radius: meshRadius(mesh),
+                    weight: CAT_BY_ID[part.cat].explode,
+                    glassy: false,
+                    specimen,
+                    parcel: parcelColor(part.cat, part.label.length),
+                    placed: false,
+                  });
+                  directory.push({
+                    key: part.key,
+                    label: part.label,
+                    side: part.side,
+                    region: "Peripheral nervous system",
+                    cat: part.cat,
+                    ta2: "Peripheral nervous system",
+                    blurb: part.blurb,
+                  });
+                }
               }
             }
 
@@ -1935,14 +2007,14 @@ function Specimen() {
             const homeTarget = center.clone().addScaledVector(superior, -maxDim * 0.12);
             camera.position.copy(homeCam);
             camera.near = maxDim * 0.0015;
-            camera.far = maxDim * 40;
+            camera.far = maxDim * 80;
             camera.lookAt(homeTarget);
             camera.updateProjectionMatrix();
             const controls = controlsRef.current;
             if (controls) {
               controls.target.copy(homeTarget);
               controls.minDistance = maxDim * 0.03;
-              controls.maxDistance = maxDim * 18;
+              controls.maxDistance = maxDim * 28;
               controls.update();
             }
 
@@ -2213,7 +2285,7 @@ function Specimen() {
     const breathe = scenarioOn ? 0.5 + 0.5 * Math.sin(performance.now() * 0.0016) : 0;
 
     for (const rec of frame.records) {
-      let op = state.visible[rec.cat] ? state.opacity[rec.cat] : 0;
+      let op = (state.visible[rec.cat] ?? CAT_BY_ID[rec.cat].visible) ? (state.opacity[rec.cat] ?? CAT_BY_ID[rec.cat].opacity) : 0;
       if (state.isolated === "selection") {
         if (state.selected !== rec.key) op *= 0.045;
       } else if (state.isolated && state.isolated !== rec.cat) {
@@ -2227,6 +2299,7 @@ function Specimen() {
         if (scenarioOn.has(rec.key)) op = Math.max(op, 0.96);
         else op = Math.min(op, 0.02);
       }
+      if (rec.key === "env:dura" || rec.key === "env:arachnoid") op = 0;
       if (state.selected === rec.key) op = Math.max(op, state.visible[rec.cat] ? 0.92 : op);
       if (state.tissue && state.sample === "hip" && rec.label === "Hippocampus" && rec.side === "left") {
         op = Math.max(op, 1);
@@ -2289,28 +2362,37 @@ function Specimen() {
 
       const color = state.mode === "parcellation" ? rec.parcel : rec.specimen;
       if (!rec.mat.color.equals(color)) rec.mat.color.copy(color);
-      if (rec.cat === "cortex" || rec.cat === "cerebellum" || rec.cat === "deep_grey" || rec.cat === "brainstem" || rec.cat === "spinal_cord") {
+      if (rec.cat === "cortex" || rec.cat === "cerebellum") {
         const phys = rec.mat as THREE.MeshPhysicalMaterial;
         const dull = rec.cat === "cortex" && !state.piaOn;
+        if (rec.cat === "cortex" && state.mode !== "parcellation") rec.mat.color.set("#d4a394");
+        rec.mat.roughness = dull ? 0.86 : 0.72;
+        rec.mat.metalness = 0;
+        rec.mat.envMapIntensity = 0;
+        if (phys.isMeshPhysicalMaterial) {
+          phys.clearcoat = 0;
+          phys.sheen = 0;
+          phys.iridescence = 0;
+          phys.transmission = 0;
+        }
+      } else if (rec.cat === "deep_grey" || rec.cat === "brainstem" || rec.cat === "spinal_cord") {
+        const phys = rec.mat as THREE.MeshPhysicalMaterial;
         const rough0 = (rec.mat.userData.rough0 as number) ?? 0.46;
         const coat0 = (rec.mat.userData.coat0 as number) ?? 0.16;
-        rec.mat.roughness = dull ? 0.78 : rough0;
+        rec.mat.roughness = rough0;
         rec.mat.metalness = 0.02;
-        rec.mat.envMapIntensity = dull ? 0.02 : rec.cat === "cortex" || rec.cat === "cerebellum" ? 0.04 : rec.cat === "spinal_cord" ? 0.1 : rec.cat === "deep_grey" || rec.cat === "brainstem" ? 0.05 : 0.06;
+        rec.mat.envMapIntensity = rec.cat === "spinal_cord" ? 0.1 : rec.cat === "deep_grey" || rec.cat === "brainstem" ? 0.05 : 0.06;
         if (phys.isMeshPhysicalMaterial) {
-          const film = !dull && state.quality === "high" && rec.cat === "cortex" && phys.iridescence > 0 ? close : 0;
-          const shell = rec.cat === "cortex" || rec.cat === "cerebellum";
-          phys.clearcoat = dull ? 0.01 : shell ? 0.02 : Math.min(coat0, 0.08);
-          phys.clearcoatRoughness = dull || shell ? 0.84 : Math.max(0.5, 0.58 - film * 0.04);
-          phys.sheen = dull ? 0.01 : rec.cat === "spinal_cord" ? 0.08 : shell ? 0.02 : 0.05;
-          if (film > 0) phys.iridescence = 0.004 + film * 0.02;
+          phys.clearcoat = Math.min(coat0, 0.08);
+          phys.clearcoatRoughness = Math.max(0.5, 0.58);
+          phys.sheen = rec.cat === "spinal_cord" ? 0.08 : 0.05;
         }
       }
       if (rec.cat === "white_matter" || rec.cat === "tracts") {
         rec.mat.color.set(state.mode === "parcellation" ? rec.parcel : rec.cat === "white_matter" ? "#e8a898" : "#e39d94");
-        rec.mat.envMapIntensity = 0.02;
+        rec.mat.envMapIntensity = 0;
         rec.mat.metalness = 0;
-        rec.mat.roughness = 0.82;
+        rec.mat.roughness = 0.92;
       }
       const lit = scenarioOn?.has(rec.key) ?? false;
       const cutAt = state.tour && state.scenario === state.tour.id ? state.tour.index : -1;
@@ -2348,10 +2430,12 @@ function Specimen() {
       } else if (/choroid/i.test(rec.label)) {
         rec.mat.emissive.set("#6a3034");
         rec.mat.emissiveIntensity = 0.12 + pulse * 0.4;
-      } else if (rec.cat === "cortex" || rec.cat === "cerebellum" || rec.cat === "deep_grey" || rec.cat === "brainstem") {
-        const dull = rec.cat === "cortex" && !state.piaOn;
-        rec.mat.emissive.set(dull ? "#000000" : "#3d1816");
-        rec.mat.emissiveIntensity = dull ? 0 : 0.008 + pulse * 0.008;
+      } else if (rec.cat === "cortex" || rec.cat === "cerebellum") {
+        rec.mat.emissive.set("#000000");
+        rec.mat.emissiveIntensity = 0;
+      } else if (rec.cat === "deep_grey" || rec.cat === "brainstem") {
+        rec.mat.emissive.set("#3d1816");
+        rec.mat.emissiveIntensity = 0.008 + pulse * 0.008;
       } else if (rec.cat === "spinal_cord") {
         rec.mat.emissive.set("#5a4038");
         rec.mat.emissiveIntensity = 0.02 + pulse * 0.02;
@@ -2446,7 +2530,7 @@ function Specimen() {
       for (const rec of frame.records) {
         const phys = rec.mat as THREE.MeshPhysicalMaterial;
         if (
-          (rec.cat === "cortex" || rec.cat === "cerebellum" || rec.cat === "brainstem" || rec.cat === "deep_grey") &&
+          (rec.cat === "brainstem" || rec.cat === "deep_grey") &&
           phys.isMeshPhysicalMaterial
         ) {
           const amount = rec.cat === "deep_grey" ? 0.07 : 0.1;
@@ -2457,13 +2541,10 @@ function Specimen() {
           phys.needsUpdate = true;
         }
         if (rec.cat === "cortex" && phys.isMeshPhysicalMaterial) {
-          const film = high ? 0.012 : 0;
-          if ((phys.iridescence > 0) !== (film > 0)) {
-            phys.iridescence = film;
-            phys.iridescenceIOR = 1.28;
-            phys.iridescenceThicknessRange = [200, 460];
-            phys.needsUpdate = true;
-          }
+          phys.iridescence = 0;
+          phys.transmission = 0;
+          phys.clearcoat = 0;
+          phys.sheen = 0;
         }
         rec.mesh.castShadow = state.quality !== "low" && CAP_CATS.has(rec.cat);
       }
@@ -2520,12 +2601,12 @@ function Specimen() {
 
   return (
     <>
-      <hemisphereLight args={["#c5d0d8", "#241c18", 0.08]} />
+      <hemisphereLight args={["#c5d0d8", "#241c18", 0.03]} />
       <ambientLight intensity={0.03} />
       <directionalLight
         ref={keyRef}
         position={[0.2, 2.6, 0.4]}
-        intensity={0.4}
+        intensity={0.26}
         color="#e4eef8"
         castShadow
         shadow-mapSize={[512, 512]}
@@ -2569,11 +2650,11 @@ export function Stage() {
           alpha: false,
           localClippingEnabled: true,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 0.75,
+          toneMappingExposure: 0.7,
           powerPreference: "high-performance",
         }}
         onCreated={({ gl, scene }) => {
-          gl.toneMappingExposure = 0.75;
+          gl.toneMappingExposure = 0.7;
           gl.outputColorSpace = THREE.SRGBColorSpace;
           gl.shadowMap.enabled = true;
           gl.shadowMap.type = THREE.PCFSoftShadowMap;
