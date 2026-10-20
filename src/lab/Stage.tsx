@@ -205,7 +205,7 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
     color: specimen,
     roughness,
     metalness: vessel ? 0.12 : 0.02,
-    envMapIntensity: vessel ? 0.35 : cat === "cortex" || cat === "cerebellum" ? 0.06 : cat === "white_matter" || cat === "tracts" ? 0.03 : wet ? 0.08 : 0.12,
+    envMapIntensity: vessel ? 0.28 : cat === "cortex" || cat === "cerebellum" ? 0.04 : cat === "white_matter" || cat === "tracts" ? 0.02 : wet ? 0.08 : 0.1,
     side: sheet ? THREE.DoubleSide : THREE.FrontSide,
     transparent: glassy || meta.transparent,
     opacity: meta.opacity,
@@ -213,9 +213,9 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
   });
   if (physical) {
     const phys = mat as THREE.MeshPhysicalMaterial;
-    phys.clearcoat = cat === "cortex" || cat === "cerebellum" ? 0.04 : wet || vessel ? 0.06 : 0;
-    phys.clearcoatRoughness = cat === "cortex" || cat === "cerebellum" ? 0.72 : wet ? 0.62 : 0.5;
-    phys.sheen = cat === "cortex" || cat === "cerebellum" ? 0.04 : wet ? 0.08 : 0;
+    phys.clearcoat = cat === "cortex" || cat === "cerebellum" ? 0.02 : wet || vessel ? 0.06 : 0;
+    phys.clearcoatRoughness = cat === "cortex" || cat === "cerebellum" ? 0.84 : wet ? 0.62 : 0.5;
+    phys.sheen = cat === "cortex" || cat === "cerebellum" ? 0.02 : wet ? 0.08 : 0;
     phys.sheenRoughness = 0.55;
     phys.sheenColor.set("#a87468");
     if (vessel) {
@@ -275,12 +275,12 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
   if (cat === "white_matter" || cat === "tracts") {
     mat.roughness = 0.82;
     mat.metalness = 0;
-    mat.envMapIntensity = 0.03;
+    mat.envMapIntensity = 0.02;
   }
   mat.userData.rough0 = mat.roughness;
   mat.userData.coat0 = (mat as THREE.MeshPhysicalMaterial).clearcoat ?? 0;
   mat.userData.aniso = cat === "tracts" ? 0.34 : cat === "white_matter" ? 0.24 : cat === "brainstem" ? 0.12 : 0;
-  mat.userData.scatter = cat === "cortex" || cat === "cerebellum" ? 0.22 : cat === "brainstem" ? 0.16 : cat === "deep_grey" ? 0.08 : 0;
+  mat.userData.scatter = cat === "cortex" || cat === "cerebellum" ? 0.06 : cat === "brainstem" ? 0.08 : cat === "deep_grey" ? 0.04 : 0;
   mat.userData.fiber = new THREE.Vector3(0, 1, 0);
   if (vessel) {
     mat.polygonOffset = true;
@@ -2296,18 +2296,19 @@ function Specimen() {
         const coat0 = (rec.mat.userData.coat0 as number) ?? 0.16;
         rec.mat.roughness = dull ? 0.78 : rough0;
         rec.mat.metalness = 0.02;
-        rec.mat.envMapIntensity = dull ? 0.04 : rec.cat === "cortex" || rec.cat === "cerebellum" ? 0.07 : rec.cat === "spinal_cord" ? 0.14 : rec.cat === "deep_grey" || rec.cat === "brainstem" ? 0.08 : 0.1;
+        rec.mat.envMapIntensity = dull ? 0.02 : rec.cat === "cortex" || rec.cat === "cerebellum" ? 0.04 : rec.cat === "spinal_cord" ? 0.1 : rec.cat === "deep_grey" || rec.cat === "brainstem" ? 0.05 : 0.06;
         if (phys.isMeshPhysicalMaterial) {
           const film = !dull && state.quality === "high" && rec.cat === "cortex" && phys.iridescence > 0 ? close : 0;
-          phys.clearcoat = dull ? 0.01 : Math.min(coat0, rec.cat === "cortex" || rec.cat === "cerebellum" ? 0.07 : 0.09) + film * 0.03;
-          phys.clearcoatRoughness = dull ? 0.84 : Math.max(0.46, (rec.cat === "cortex" || rec.cat === "cerebellum" ? 0.58 : 0.5) - film * 0.06);
-          phys.sheen = dull ? 0.01 : rec.cat === "spinal_cord" ? 0.12 : rec.cat === "cortex" || rec.cat === "cerebellum" ? 0.09 : 0.08;
-          if (film > 0) phys.iridescence = 0.008 + film * 0.04;
+          const shell = rec.cat === "cortex" || rec.cat === "cerebellum";
+          phys.clearcoat = dull ? 0.01 : shell ? 0.02 : Math.min(coat0, 0.08);
+          phys.clearcoatRoughness = dull || shell ? 0.84 : Math.max(0.5, 0.58 - film * 0.04);
+          phys.sheen = dull ? 0.01 : rec.cat === "spinal_cord" ? 0.08 : shell ? 0.02 : 0.05;
+          if (film > 0) phys.iridescence = 0.004 + film * 0.02;
         }
       }
       if (rec.cat === "white_matter" || rec.cat === "tracts") {
         rec.mat.color.set(state.mode === "parcellation" ? rec.parcel : rec.cat === "white_matter" ? "#e8a898" : "#e39d94");
-        rec.mat.envMapIntensity = 0.03;
+        rec.mat.envMapIntensity = 0.02;
         rec.mat.metalness = 0;
         rec.mat.roughness = 0.82;
       }
@@ -2524,7 +2525,7 @@ function Specimen() {
       <directionalLight
         ref={keyRef}
         position={[0.2, 2.6, 0.4]}
-        intensity={0.62}
+        intensity={0.4}
         color="#e4eef8"
         castShadow
         shadow-mapSize={[512, 512]}
@@ -2568,11 +2569,11 @@ export function Stage() {
           alpha: false,
           localClippingEnabled: true,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 0.78,
+          toneMappingExposure: 0.75,
           powerPreference: "high-performance",
         }}
         onCreated={({ gl, scene }) => {
-          gl.toneMappingExposure = 0.78;
+          gl.toneMappingExposure = 0.75;
           gl.outputColorSpace = THREE.SRGBColorSpace;
           gl.shadowMap.enabled = true;
           gl.shadowMap.type = THREE.PCFSoftShadowMap;

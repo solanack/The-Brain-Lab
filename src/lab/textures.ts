@@ -55,7 +55,7 @@ const TUNING: Record<TextureKind, { scale: number; bump: number; alpha: number }
 };
 
 const cache = new Map<TextureKind, Pack>();
-const TEX_VERSION = 12;
+const TEX_VERSION = 13;
 
 function hash(ix: number, iy: number) {
   let n = Math.imul(ix, 374761393) + Math.imul(iy, 668265263);
@@ -120,11 +120,11 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const vein = smooth(0.018, 0.08, Math.abs(fbm(pu * 0.65, pv + 0.3, 5, 4) - 0.5));
     const cap = smooth(0.012, 0.05, Math.abs(fbm(pu + 0.55, pv, 11, 3) - 0.48));
     const open = Math.min(vein, cap);
-    const base = lerp(0.74, 0.9, blot);
+    const base = lerp(0.58, 0.72, blot);
     return {
-      r: Math.min(0.93, base * lerp(0.82, 1, open)),
-      g: Math.min(0.84, base * lerp(0.62, 0.9, open) * lerp(0.98, 1.02, pores)),
-      b: Math.min(0.76, base * lerp(0.58, 0.84, open)),
+      r: Math.min(0.8, base * lerp(0.78, 1, open)),
+      g: Math.min(0.72, base * lerp(0.6, 0.88, open) * lerp(0.98, 1.02, pores)),
+      b: Math.min(0.66, base * lerp(0.55, 0.82, open)),
       rough: lerp(0.7, 0.4, open),
       height: 0.66 + (pores - 0.5) * 0.06 - (1 - vein) * 0.2 - (1 - cap) * 0.08,
       mask: 1,
@@ -190,11 +190,11 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const pearl = fbm(pu, pv, 4, 4);
     const sheen = along * 0.62 + cross * 0.38;
     const pale = kind === "ecm" ? 0.5 : 1;
-    const tone = lerp(0.72, 0.84, pearl);
+    const tone = lerp(0.6, 0.74, pearl);
     return {
-      r: Math.min(0.88, tone * lerp(0.98, 1.04, sheen * 0.25)),
-      g: Math.min(0.72, tone * 0.82),
-      b: Math.min(0.66, tone * 0.74),
+      r: Math.min(0.8, tone * lerp(0.96, 1.02, sheen * 0.2)),
+      g: Math.min(0.68, tone * 0.84),
+      b: Math.min(0.62, tone * 0.76),
       rough: (lerp(0.88, 0.7, sheen) * pale) + (1 - pale) * 0.72,
       height: 0.5 + (sheen - 0.5) * 0.22 + (pearl - 0.5) * 0.08,
       mask: 1,
@@ -464,7 +464,7 @@ vFiber = mat3(modelMatrix) * uFiber;`,
     vec3 hi = triRgb(tAlb, gP * 2.5, gBlend);
     alb = mix(alb, alb * (0.84 + hi * 0.22), uClose * 0.7);
   }
-  diffuseColor.rgb *= alb * 0.88;
+  diffuseColor.rgb *= alb * 0.72;
   gCavity = smoothstep(0.55, 0.28, gSurf.r);
   diffuseColor.rgb *= mix(vec3(1.0), vec3(0.82, 0.74, 0.7), gCavity * 0.45);
   diffuseColor.a *= mix(1.0, mix(1.0 - uAlpha, 1.0, gSurf.b), uDetail);
@@ -506,7 +506,7 @@ vFiber = mat3(modelMatrix) * uFiber;`,
 {
   float gShade = smoothstep(0.58, 0.22, gSurf.r);
   float wrap = pow(clamp(dot(normal, vec3(0.15, 0.95, 0.25)) * 0.55 + 0.45, 0.0, 1.0), 1.5);
-  outgoingLight += vec3(0.55, 0.28, 0.22) * wrap * uScatter * (0.03 + gShade * 0.03);
+  outgoingLight += vec3(0.42, 0.18, 0.14) * wrap * uScatter * (0.012 + gShade * 0.012);
   outgoingLight *= mix(vec3(1.0), vec3(0.9, 0.84, 0.8), gShade * 0.16);
 }`,
     );
@@ -516,7 +516,7 @@ export function applyTriplanar(mat: THREE.Material, kind: TextureKind) {
   ensureTextures();
   const pack = cache.get(kind);
   if (!pack) return;
-  mat.customProgramCacheKey = () => "neurotome-triplanar-v12";
+  mat.customProgramCacheKey = () => "neurotome-triplanar-v13";
   mat.onBeforeCompile = (shader) => {
     compileTriplanar(shader, pack);
     const fiber = mat.userData.fiber as THREE.Vector3 | undefined;
