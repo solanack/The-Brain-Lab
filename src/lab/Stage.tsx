@@ -9,6 +9,7 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import {
   CAT_BY_ID,
   CAT_IDS,
+  CATEGORIES,
   RECIPES,
   RECIPE_BY_ID,
   pearlFor,
@@ -19,7 +20,7 @@ import {
 } from "./data";
 import { useLab, type Axis, type Meta } from "./store";
 import { SCENARIO_BY_ID, circuitLinks, lostToCut, scenarioFocus, scenarioHit, type ModuleStop } from "./scenarios";
-import { applyHeartMap, applyRepeating, applySpinalUv, applyTriplanar, nerveMaterial, tissueTextures } from "./textures";
+import { applyHeartMap, applyLungMap, applyPericardiumMap, applyRepeating, applySpinalUv, applyTriplanar, nerveMaterial, tissueTextures } from "./textures";
 import { buildPeripheral } from "./nerves";
 import { buildCirculation } from "./heart";
 
@@ -72,6 +73,9 @@ const Y_UP = new THREE.Vector3(0, 1, 0);
 const _desired = new THREE.Vector3();
 const _twist = new THREE.Quaternion();
 const _twistAxis = new THREE.Vector3(0, 1, 0);
+let layersOpened = false;
+let lungClock = 0;
+const _hingeAxis = new THREE.Vector3(1, 0, 0);
 const _pos = new THREE.Vector3();
 const _view = new THREE.Vector3();
 const SCENARIO_GOLD = new THREE.Color("#a86848");
@@ -170,6 +174,11 @@ function parcelColor(cat: CatId, index: number) {
     sympathetic: [0.98, 1.02],
     veins: [0.74, 0.82],
     heart: [0.98, 1.02],
+    pericardium: [0.06, 0.1],
+    lungs: [0.97, 1.01],
+    pleura: [0.06, 0.1],
+    diaphragm: [0.98, 1.02],
+    airway: [0.04, 0.08],
     globe: [0.04, 0.08],
     orbit: [0.01, 0.04],
   };
@@ -200,7 +209,7 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
     cat === "orbit";
   const flesh = cat === "cortex" || cat === "cerebellum" || cat === "deep_grey" || cat === "brainstem";
   const vessel = cat === "arteries" || cat === "veins_sinuses" || cat === "veins";
-  const physical = wet || vessel || cat === "ventricles" || cat === "arachnoid" || cat === "globe" || cat === "heart";
+  const physical = wet || vessel || cat === "ventricles" || cat === "arachnoid" || cat === "globe" || cat === "heart" || cat === "lungs" || cat === "pericardium" || cat === "pleura" || cat === "diaphragm" || cat === "airway";
   const roughJitter = (hashUnit(seed) - 0.5) * 0.08;
   if (flesh) specimen.offsetHSL((hashUnit(seed + 3) - 0.5) * 0.008, 0, (hashUnit(seed + 9) - 0.5) * 0.012);
   const roughness = flesh
@@ -262,6 +271,60 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
       phys.emissiveIntensity = 0.08;
       mat.roughness = 0.48;
     }
+    if (cat === "lungs") {
+      phys.roughness = 0.46;
+      phys.clearcoat = 0.12;
+      phys.clearcoatRoughness = 0.4;
+      phys.sheen = 0.22;
+      phys.sheenColor.set("#e7b8b4");
+      phys.sheenRoughness = 0.48;
+      mat.roughness = 0.46;
+      mat.color.set("#c99590");
+    }
+    if (cat === "pericardium") {
+      phys.roughness = 0.58;
+      phys.clearcoat = 0.04;
+      phys.clearcoatRoughness = 0.7;
+      phys.sheen = 0.08;
+      phys.sheenColor.set("#f0e6dc");
+      phys.transmission = 0;
+      mat.roughness = 0.58;
+      mat.transparent = true;
+      mat.opacity = 0.38;
+      mat.depthWrite = false;
+      mat.side = THREE.DoubleSide;
+      mat.color.set("#efe4d8");
+    }
+    if (cat === "pleura") {
+      phys.roughness = 0.48;
+      phys.clearcoat = 0.08;
+      phys.clearcoatRoughness = 0.55;
+      phys.sheen = 0.16;
+      phys.sheenColor.set("#f7f1ea");
+      mat.roughness = 0.48;
+      mat.transparent = true;
+      mat.opacity = 0.28;
+      mat.depthWrite = false;
+      mat.side = THREE.DoubleSide;
+      mat.color.set("#f4ece4");
+    }
+    if (cat === "diaphragm") {
+      phys.roughness = 0.5;
+      phys.clearcoat = 0.05;
+      phys.sheen = 0.14;
+      phys.sheenColor.set("#c98a84");
+      mat.roughness = 0.5;
+      mat.color.set("#b86a64");
+    }
+    if (cat === "airway") {
+      phys.roughness = 0.4;
+      phys.clearcoat = 0.16;
+      phys.clearcoatRoughness = 0.42;
+      phys.sheen = 0.08;
+      phys.sheenColor.set("#f3eadf");
+      mat.roughness = 0.4;
+      mat.color.set("#efe4d6");
+    }
     if (cat === "arachnoid") {
       phys.iridescence = 0;
       phys.clearcoat = 0;
@@ -306,7 +369,7 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
     mat.polygonOffsetUnits = -2;
   }
   if (cat === "spinal_cord") applySpinalUv(mat);
-  else if (cat !== "heart")
+  else if (cat !== "heart" && cat !== "lungs" && cat !== "pericardium" && cat !== "pleura" && cat !== "diaphragm" && cat !== "airway")
     applyTriplanar(mat, cat === "veins" ? "veins_sinuses" : cat === "spinal_nerves" || cat === "peripheral" || cat === "sympathetic" ? "cranial_nerves" : cat);
   mat.color.set(CAT_BY_ID[cat].color);
   if (cat === "cortex") mat.color.set("#d4a394");
@@ -1020,6 +1083,28 @@ function visualTarget(rec: Rec, frame: Frame, explode: number, retract: number, 
       break;
     case "heart":
       out.addScaledVector(rec.dir, e * rec.weight * md * 0.46);
+      break;
+    case "pericardium":
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.62);
+      out.addScaledVector(frame.anterior, e * md * 0.18);
+      break;
+    case "lungs":
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.5);
+      if (rec.side === "left") out.addScaledVector(frame.right, -e * md * 0.22);
+      if (rec.side === "right") out.addScaledVector(frame.right, e * md * 0.22);
+      break;
+    case "pleura":
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.62);
+      if (rec.side === "left") out.addScaledVector(frame.right, -e * md * 0.34);
+      if (rec.side === "right") out.addScaledVector(frame.right, e * md * 0.34);
+      break;
+    case "diaphragm":
+      out.addScaledVector(frame.superior, -e * rec.weight * md * 0.28);
+      out.addScaledVector(frame.anterior, e * md * 0.06);
+      break;
+    case "airway":
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.4);
+      out.addScaledVector(frame.anterior, e * md * 0.1);
       break;
     case "globe":
     case "orbit":
@@ -1974,16 +2059,65 @@ function Specimen() {
                     blurb: part.blurb,
                   });
                 }
-                for (const part of buildCirculation(origin, inferior, anterior, rightAxis, unitToMm)) {
+                const caudalArtery = (label: RegExp, side: "left" | "right") => {
+                  const hits = records.filter((r) => r.cat === "arteries" && r.side === side && label.test(r.label));
+                  if (!hits.length) return undefined;
+                  hits.sort((a, b) => b.restCenter.dot(inferior) - a.restCenter.dot(inferior));
+                  const mesh = hits[0]!.mesh;
+                  const pos = mesh.geometry.getAttribute("position");
+                  const tmp = new THREE.Vector3();
+                  let best = -Infinity;
+                  const out = new THREE.Vector3();
+                  const step = Math.max(1, Math.floor(pos.count / 700));
+                  for (let i = 0; i < pos.count; i += step) {
+                    tmp.fromBufferAttribute(pos, i);
+                    mesh.localToWorld(tmp);
+                    const along = tmp.dot(inferior);
+                    if (along > best) {
+                      best = along;
+                      out.copy(tmp);
+                    }
+                  }
+                  return out;
+                };
+                for (const part of buildCirculation(origin, inferior, anterior, rightAxis, unitToMm, {
+                  carotidRight: caudalArtery(/internal carotid/i, "right"),
+                  carotidLeft: caudalArtery(/internal carotid/i, "left"),
+                  vertebralRight: caudalArtery(/^vertebral artery/i, "right"),
+                  vertebralLeft: caudalArtery(/^vertebral artery/i, "left"),
+                })) {
                   const color = new THREE.Color(part.color ?? CAT_BY_ID[part.cat].color);
                   const mat = makeMaterial(part.cat, color.clone(), part.label.length);
                   if (part.color) mat.color.set(part.color);
                   else mat.color.copy(color);
-                  if (part.cat === "heart" && !part.key.startsWith("heart:fat")) {
+                  if (part.cat === "heart" && !part.plain && !part.key.startsWith("heart:fat")) {
                     applyHeartMap(mat);
                     mat.bumpScale = 0.4 / unitToMm;
                   }
-                  if (part.cat === "heart") mat.side = THREE.DoubleSide;
+                  if (part.cat === "heart" || part.cat === "pericardium") mat.side = THREE.DoubleSide;
+                  if (part.cat === "lungs") applyLungMap(mat);
+                  if (part.cat === "pericardium" || part.cat === "pleura") applyPericardiumMap(mat);
+                  if (part.cat === "diaphragm") {
+                    applyHeartMap(mat);
+                    mat.bumpScale = 0.5 / unitToMm;
+                    mat.color.set("#b86a64");
+                  }
+                  if (part.beat === "semilunar" || part.beat === "av") {
+                    const phys = mat as THREE.MeshPhysicalMaterial;
+                    phys.roughness = 0.32;
+                    phys.clearcoat = 0.22;
+                    phys.clearcoatRoughness = 0.34;
+                    phys.sheen = 0.24;
+                    phys.sheenColor.set("#f6ebe4");
+                    phys.transmission = 0.18;
+                    phys.thickness = 0.4;
+                    phys.ior = 1.38;
+                    phys.attenuationColor = new THREE.Color("#e7b0a8");
+                    phys.attenuationDistance = 0.02;
+                    mat.transparent = true;
+                    mat.opacity = 0.94;
+                    mat.depthWrite = false;
+                  }
                   const mesh = new THREE.Mesh(part.geo, mat);
                   mesh.userData.key = part.key;
                   if (part.beat) mesh.userData.beat = part.beat;
@@ -1992,6 +2126,7 @@ function Specimen() {
                     mesh.quaternion.copy(part.orient);
                     mesh.userData.baseQuat = part.orient.clone();
                   }
+                  if (part.openAngle) mesh.userData.openAngle = part.openAngle;
                   gltf.scene.add(mesh);
                   const focus = part.center ? meshCenter(mesh).applyQuaternion(mesh.quaternion).add(part.center) : meshCenter(mesh);
                   records.push({
@@ -2264,6 +2399,13 @@ function Specimen() {
     if (!frame) return;
     const d = Math.min(delta, 0.05);
     const state = useLab.getState();
+    if (!layersOpened) {
+      layersOpened = true;
+      const visible = { ...state.visible };
+      for (const cat of CATEGORIES) visible[cat.id] = true;
+      useLab.getState().patch({ visible });
+    }
+    lungClock += d;
     if (state.intentNonce !== nonce.current) {
       nonce.current = state.intentNonce;
       const intent = state.intent;
@@ -2407,6 +2549,18 @@ function Specimen() {
         const baseQ = rec.mesh.userData.baseQuat as THREE.Quaternion | undefined;
         rec.mesh.scale.set(1 - atrial * 0.09, 1 - atrial * 0.05, 1 - atrial * 0.09);
         if (baseQ) rec.mesh.quaternion.copy(baseQ);
+      } else if ((rec.mesh.userData.beat === "semilunar" || rec.mesh.userData.beat === "av") && rec.mesh.userData.baseQuat) {
+        const baseQ = rec.mesh.userData.baseQuat as THREE.Quaternion;
+        const amt = rec.mesh.userData.beat === "semilunar" ? pulse : 1 - pulse;
+        _twist.setFromAxisAngle(_hingeAxis, (rec.mesh.userData.openAngle as number) * amt);
+        rec.mesh.quaternion.copy(baseQ).multiply(_twist);
+        rec.mesh.scale.set(1, 1, 1);
+      } else if (rec.cat === "lungs") {
+        const breathe = 0.5 + 0.5 * Math.sin(lungClock * 0.55 + (rec.side === "left" ? 0.4 : 0));
+        rec.mesh.scale.setScalar(1 + breathe * 0.02);
+      } else if (rec.cat === "diaphragm") {
+        const breathe = 0.5 + 0.5 * Math.sin(lungClock * 0.55);
+        rec.mesh.scale.set(1, 1 - breathe * 0.07, 1);
       }
       const caps = rec.mesh.userData.caps as THREE.Mesh[] | undefined;
       if (caps) {
@@ -2510,11 +2664,21 @@ function Specimen() {
       } else if (dead) {
         rec.mat.emissive.set("#000000");
         rec.mat.emissiveIntensity = 0;
+      } else if (rec.mesh.userData.beat === "node") {
+        const kick = rec.key.includes(":sa") ? atrial : rec.key.includes(":avn") ? Math.max(atrial * 0.65, pulse * 0.35) : pulse;
+        rec.mat.emissive.set("#e7c8a4");
+        rec.mat.emissiveIntensity = 0.04 + kick * 0.42;
       } else if (rec.cat === "heart") {
-        const kick = rec.mesh.userData.beat === "atrium" ? atrial : pulse;
-        const fat = rec.key.startsWith("heart:fat");
-        rec.mat.emissive.set(fat ? "#6a5030" : "#6a2024");
-        rec.mat.emissiveIntensity = (fat ? 0.03 : 0.08) + kick * (fat ? 0.08 : 0.7);
+        const beat = rec.mesh.userData.beat;
+        if (beat === "semilunar" || beat === "av") {
+          rec.mat.emissive.set("#5a3030");
+          rec.mat.emissiveIntensity = 0.03;
+        } else {
+          const kick = beat === "atrium" ? atrial : pulse;
+          const fat = rec.key.startsWith("heart:fat");
+          rec.mat.emissive.set(fat ? "#6a5030" : "#6a2024");
+          rec.mat.emissiveIntensity = (fat ? 0.03 : 0.08) + kick * (fat ? 0.08 : 0.7);
+        }
       } else if (rec.cat === "arteries" || rec.cat === "veins_sinuses" || rec.cat === "veins") {
         rec.mat.emissive.copy(rec.specimen).multiplyScalar(0.18);
         const coronary = rec.mesh.userData.beat === "coronary";

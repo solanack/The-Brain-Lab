@@ -423,8 +423,8 @@ function Layers() {
         <Pill
           onClick={() =>
             applyOpacity(
-              { cortex: 0.06, cerebellum: 0.08, brainstem: 0.3, white_matter: 0.05, arteries: 1, veins_sinuses: 1, veins: 1, heart: 1 },
-              { visible: { ...useLab.getState().visible, arteries: true, veins_sinuses: true, veins: true, heart: true, cranial_nerves: false } },
+              { cortex: 0.06, cerebellum: 0.08, brainstem: 0.3, white_matter: 0.05, arteries: 1, veins_sinuses: 1, veins: 1, heart: 1, pericardium: 0.38, lungs: 1, pleura: 0.28, diaphragm: 1, airway: 1 },
+              { visible: { ...useLab.getState().visible, arteries: true, veins_sinuses: true, veins: true, heart: true, pericardium: true, lungs: true, pleura: true, diaphragm: true, airway: true, cranial_nerves: false } },
             )
           }
         >

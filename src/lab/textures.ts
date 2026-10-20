@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { CatId } from "./data";
 
-export type TextureKind = Exclude<CatId, "spinal_cord" | "spinal_nerves" | "peripheral" | "sympathetic" | "heart" | "veins"> | "cell" | "ecm";
+export type TextureKind = Exclude<CatId, "spinal_cord" | "spinal_nerves" | "peripheral" | "sympathetic" | "heart" | "veins" | "lungs" | "pericardium" | "pleura" | "diaphragm" | "airway"> | "cell" | "ecm";
 
 type Pack = {
   alb: THREE.CanvasTexture;
@@ -700,6 +700,124 @@ export function applyHeartMap(mat: THREE.MeshStandardMaterial) {
   mat.roughnessMap = pack.surf;
   mat.bumpMap = pack.surf;
   mat.bumpScale = 0.00025;
+}
+
+const LUNG_U = 256;
+const LUNG_V = 256;
+let lungTex: { alb: THREE.CanvasTexture; surf: THREE.CanvasTexture } | null = null;
+
+function shadeLung(u: number, v: number): Ink {
+  const grain = fbm(u * 5.5, v * 7, 5, 4);
+  const pore = Math.pow(0.5 + 0.5 * Math.sin((u * 46 + v * 13) * Math.PI * 2), 2);
+  const lobule = 0.5 + 0.5 * Math.sin((u * 9 + v * 2.2) * Math.PI * 2);
+  const vessel = smooth(0.012, 0.0022, wrapDist(u, 0.18 + 0.06 * Math.sin(v * Math.PI * 3)));
+  const vessel2 = smooth(0.008, 0.0016, wrapDist(v, 0.62 + 0.04 * Math.sin(u * Math.PI * 5)));
+  const blood = Math.max(vessel, vessel2 * 0.7);
+  let r = lerp(0.78, 0.96, grain) * lerp(0.94, 1.02, lobule);
+  let g = lerp(0.74, 0.9, grain);
+  let b = lerp(0.72, 0.86, grain);
+  r *= lerp(0.9, 1, pore);
+  g *= lerp(0.9, 1, pore);
+  r = lerp(r, 0.5, blood * 0.55);
+  g = lerp(g, 0.24, blood * 0.55);
+  b = lerp(b, 0.22, blood * 0.55);
+  return {
+    r,
+    g,
+    b,
+    rough: lerp(0.55, 0.32, grain) * lerp(1, 0.8, 1 - pore),
+    height: 0.32 + grain * 0.28 + pore * 0.16 + blood * 0.1,
+    mask: 1,
+  };
+}
+
+function lungTextures() {
+  if (lungTex) return lungTex;
+  const alb = new Uint8ClampedArray(LUNG_U * LUNG_V * 4);
+  const surf = new Uint8ClampedArray(LUNG_U * LUNG_V * 4);
+  for (let y = 0; y < LUNG_V; y++) {
+    for (let x = 0; x < LUNG_U; x++) {
+      const ink = shadeLung(x / LUNG_U, y / LUNG_V);
+      const i = (y * LUNG_U + x) * 4;
+      alb[i] = sat(ink.r) * 255;
+      alb[i + 1] = sat(ink.g) * 255;
+      alb[i + 2] = sat(ink.b) * 255;
+      alb[i + 3] = 255;
+      surf[i] = sat(ink.height) * 255;
+      surf[i + 1] = sat(ink.rough) * 255;
+      surf[i + 2] = 255;
+      surf[i + 3] = 255;
+    }
+  }
+  const albTex = toTexture(alb, LUNG_U, LUNG_V);
+  const surfTex = toTexture(surf, LUNG_U, LUNG_V);
+  albTex.wrapS = albTex.wrapT = THREE.RepeatWrapping;
+  surfTex.wrapS = surfTex.wrapT = THREE.RepeatWrapping;
+  albTex.repeat.set(2, 2);
+  surfTex.repeat.set(2, 2);
+  lungTex = { alb: albTex, surf: surfTex };
+  return lungTex;
+}
+
+export function applyLungMap(mat: THREE.MeshStandardMaterial) {
+  const pack = lungTextures();
+  mat.map = pack.alb;
+  mat.roughnessMap = pack.surf;
+  mat.bumpMap = pack.surf;
+  mat.bumpScale = 0.00045;
+}
+
+let periTex: { alb: THREE.CanvasTexture; surf: THREE.CanvasTexture } | null = null;
+
+function shadePericardium(u: number, v: number): Ink {
+  const fiber = 0.5 + 0.5 * Math.sin((u * 28 + v * 3) * Math.PI * 2);
+  const cross = 0.5 + 0.5 * Math.sin((v * 22 + u * 2) * Math.PI * 2);
+  const grain = fbm(u * 4, v * 4, 3, 3);
+  const weave = Math.max(fiber, cross * 0.65);
+  return {
+    r: lerp(0.86, 1, weave) * lerp(0.96, 1.02, grain),
+    g: lerp(0.82, 0.96, weave),
+    b: lerp(0.76, 0.9, weave),
+    rough: lerp(0.72, 0.46, weave),
+    height: 0.3 + weave * 0.4 + (grain - 0.5) * 0.08,
+    mask: 1,
+  };
+}
+
+function pericardiumTextures() {
+  if (periTex) return periTex;
+  const alb = new Uint8ClampedArray(LUNG_U * LUNG_V * 4);
+  const surf = new Uint8ClampedArray(LUNG_U * LUNG_V * 4);
+  for (let y = 0; y < LUNG_V; y++) {
+    for (let x = 0; x < LUNG_U; x++) {
+      const ink = shadePericardium(x / LUNG_U, y / LUNG_V);
+      const i = (y * LUNG_U + x) * 4;
+      alb[i] = sat(ink.r) * 255;
+      alb[i + 1] = sat(ink.g) * 255;
+      alb[i + 2] = sat(ink.b) * 255;
+      alb[i + 3] = 255;
+      surf[i] = sat(ink.height) * 255;
+      surf[i + 1] = sat(ink.rough) * 255;
+      surf[i + 2] = 255;
+      surf[i + 3] = 255;
+    }
+  }
+  const albTex = toTexture(alb, LUNG_U, LUNG_V);
+  const surfTex = toTexture(surf, LUNG_U, LUNG_V);
+  albTex.wrapS = albTex.wrapT = THREE.RepeatWrapping;
+  surfTex.wrapS = surfTex.wrapT = THREE.RepeatWrapping;
+  albTex.repeat.set(3, 2);
+  surfTex.repeat.set(3, 2);
+  periTex = { alb: albTex, surf: surfTex };
+  return periTex;
+}
+
+export function applyPericardiumMap(mat: THREE.MeshStandardMaterial) {
+  const pack = pericardiumTextures();
+  mat.map = pack.alb;
+  mat.roughnessMap = pack.surf;
+  mat.bumpMap = pack.surf;
+  mat.bumpScale = 0.0003;
 }
 
 const NERVE_U = 256;

@@ -15,6 +15,11 @@ export const CAT_IDS = [
   "veins_sinuses",
   "veins",
   "heart",
+  "pericardium",
+  "lungs",
+  "pleura",
+  "diaphragm",
+  "airway",
   "cranial_nerves",
   "spinal_nerves",
   "peripheral",
@@ -112,7 +117,7 @@ export const CATEGORIES: CatMeta[] = [
       "Population-average pathways (corticospinal, arcuate, radiations, and others). Placement is about 7 mm, for study, not for a surgical plan.",
     color: "#e39d94",
     opacity: 1,
-    visible: false,
+    visible: true,
     explode: 0.72,
     rough: 0.5,
     transparent: false,
@@ -248,6 +253,66 @@ export const CATEGORIES: CatMeta[] = [
     transparent: false,
   },
   {
+    id: "pericardium",
+    label: "Pericardium",
+    group: "Chest",
+    blurb: "The sac around the heart. It lifts away on Explode, the way the dura lifts off the brain.",
+    color: "#efe4d8",
+    opacity: 0.38,
+    visible: true,
+    explode: 1.4,
+    rough: 0.62,
+    transparent: true,
+  },
+  {
+    id: "lungs",
+    label: "Lungs",
+    group: "Chest",
+    blurb: "Left and right lungs, each lobe separate so Explode can open the fissures. The right lung has three lobes. The left has two.",
+    color: "#c99590",
+    opacity: 1,
+    visible: true,
+    explode: 1.1,
+    rough: 0.74,
+    transparent: false,
+  },
+  {
+    id: "pleura",
+    label: "Pleura",
+    group: "Chest",
+    blurb: "The sac around each lung. Explode lifts it off the lobes, the way the pericardium lifts off the heart.",
+    color: "#f4ece4",
+    opacity: 0.28,
+    visible: true,
+    explode: 1.35,
+    rough: 0.5,
+    transparent: true,
+  },
+  {
+    id: "diaphragm",
+    label: "Diaphragm",
+    group: "Chest",
+    blurb: "The muscle floor of the chest. The domes rise under the lungs and flatten as the lungs fill. The phrenic nerves end here.",
+    color: "#b86a64",
+    opacity: 1,
+    visible: true,
+    explode: 0.8,
+    rough: 0.52,
+    transparent: false,
+  },
+  {
+    id: "airway",
+    label: "Airway",
+    group: "Chest",
+    blurb: "Trachea, main bronchi, and a lobar bronchus into each lobe. Cartilage, not a vessel.",
+    color: "#efe4d6",
+    opacity: 1,
+    visible: true,
+    explode: 0.7,
+    rough: 0.42,
+    transparent: false,
+  },
+  {
     id: "cranial_nerves",
     label: "Cranial nerves",
     group: "Vessels & nerves",
@@ -255,7 +320,7 @@ export const CATEGORIES: CatMeta[] = [
       "Nerves III–XII as they leave the brainstem, including branches that run out toward the face. Hidden in the intact view so the specimen stays a brain, not a skull-base dissection.",
     color: "#e4a898",
     opacity: 1,
-    visible: false,
+    visible: true,
     explode: 0.4,
     rough: 0.46,
     transparent: false,
@@ -307,7 +372,7 @@ export const CATEGORIES: CatMeta[] = [
       "The eyeball, without lids or facial skin. A pale sclera over a darker choroid, with the intraorbital optic nerve continuing CN II onto the posterior pole.",
     color: "#f0d0c8",
     opacity: 1,
-    visible: false,
+    visible: true,
     explode: 0.7,
     rough: 0.4,
     transparent: false,
@@ -320,7 +385,7 @@ export const CATEGORIES: CatMeta[] = [
       "Extra-ocular muscles and a little orbital fat. The four recti run from the orbital apex to the globe; the obliques are simplified. Hidden until the orbit is opened.",
     color: "#8f4e44",
     opacity: 1,
-    visible: false,
+    visible: true,
     explode: 0.85,
     rough: 0.55,
     transparent: false,
@@ -331,7 +396,7 @@ export const CAT_BY_ID: Record<CatId, CatMeta> = Object.fromEntries(
   CATEGORIES.map((c) => [c.id, c]),
 ) as Record<CatId, CatMeta>;
 
-export const GROUPS = ["Meninges", "Telencephalon", "Deep gray", "Fluid spaces", "Stem & cerebellum", "Vessels & nerves", "Peripheral nervous system", "Orbit & visual pathway"];
+export const GROUPS = ["Meninges", "Telencephalon", "Deep gray", "Fluid spaces", "Stem & cerebellum", "Vessels & nerves", "Peripheral nervous system", "Orbit & visual pathway", "Chest"];
 
 const PEARLS: Record<string, string> = {
   "precentral gyrus":
@@ -418,6 +483,36 @@ const PEARLS: Record<string, string> = {
     "Wall between the atria.",
   auricle:
     "The atrial appendage. The right auricle overlaps the front of the atrium. The left is a small ear on the left.",
+  "aortic valve":
+    "Three cusps at the mouth of the aorta. They open when the left ventricle ejects and close when it relaxes, so blood cannot fall back.",
+  "pulmonary valve":
+    "Three cusps at the mouth of the pulmonary trunk. They open with the right ventricle and close in diastole.",
+  mitral:
+    "The left atrioventricular valve, two leaflets. Chordae run to papillary muscles so the valve cannot flip into the atrium during systole.",
+  tricuspid:
+    "The right atrioventricular valve, three leaflets. It closes as the right ventricle contracts.",
+  "sinus node":
+    "The pacemaker, in the right atrium at the entrance of the superior vena cava. It fires first on each beat.",
+  "atrioventricular node":
+    "On the floor of the right atrium. It delays the impulse, then passes it to the bundle in the septum.",
+  bundle:
+    "The atrioventricular bundle runs down the interventricular septum and splits toward each ventricle.",
+  "coronary sinus":
+    "The vein of the heart. It lies in the posterior atrioventricular groove and opens into the right atrium.",
+  pericardium:
+    "A fibrous sac around the heart. Explode lifts it off the surface.",
+  lung:
+    "Spongy organs on either side of the heart. Pulmonary arteries enter the hilum. Pulmonary veins leave it.",
+  pleura:
+    "A closed sac around the lung. The outer layer lines the chest. The inner layer coats the lobes. Explode lifts the sac off.",
+  diaphragm:
+    "The main muscle of breathing. It contracts and flattens as the lungs expand. The phrenic nerve, from C3 to C5, supplies it.",
+  trachea:
+    "The airway from the neck to the carina, where it divides into the main bronchi.",
+  bronchi:
+    "The right main bronchus is short and steep. The left is longer and crosses under the aortic arch. Each divides into lobar bronchi.",
+  papillary:
+    "Muscles on the inner ventricular wall. Chordae tendineae run from them to the atrioventricular valves.",
   aorta:
     "The ascending aorta leaves the left ventricle, arches over the pulmonary trunk, and descends along the spine. Its wall pulses with every ventricular ejection.",
   "vena cava":

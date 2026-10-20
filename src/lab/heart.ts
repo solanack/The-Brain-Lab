@@ -8,12 +8,14 @@ export type CircPart = {
   cat: CatId;
   side: "left" | "right" | "median";
   blurb: string;
-  beat?: "ventricle" | "atrium" | "coronary";
+  beat?: "ventricle" | "atrium" | "coronary" | "semilunar" | "av" | "node";
   center?: THREE.Vector3;
   orient?: THREE.Quaternion;
   color?: string;
   drift?: THREE.Vector3;
   weight?: number;
+  plain?: boolean;
+  openAngle?: number;
 };
 
 type Buf = { p: number[]; ix: number[]; uv?: number[] };
@@ -196,12 +198,20 @@ function ellipsoid(rx: number, ry: number, rz: number, at: THREE.Vector3, rotZ =
   return geo;
 }
 
+export type VesselTargets = {
+  carotidRight?: THREE.Vector3;
+  carotidLeft?: THREE.Vector3;
+  vertebralRight?: THREE.Vector3;
+  vertebralLeft?: THREE.Vector3;
+};
+
 export function buildCirculation(
   origin: THREE.Vector3,
   inferior: THREE.Vector3,
   anterior: THREE.Vector3,
   right: THREE.Vector3,
   unitToMm: number,
+  targets?: VesselTargets,
 ) {
   const s = (n: number) => n / unitToMm;
   const length = s(420);
@@ -387,16 +397,18 @@ export function buildCirculation(
   const split = toWorld(new THREE.Vector3(s(-4), s(54), s(18)));
   tube(trunk, chain([toWorld(new THREE.Vector3(s(-2), s(28), s(16))), toWorld(new THREE.Vector3(s(-4), s(42), s(20))), split], 4), s(10), 0.05);
   const lpa: Buf = { p: [], ix: [] };
-  tube(lpa, chain([split, toWorld(new THREE.Vector3(s(-28), s(46), s(6)))], 3), s(6.5), 0.2);
+  const hilumL = new THREE.Vector3(s(-34), s(12), s(-4));
+  const hilumR = new THREE.Vector3(s(36), s(10), s(-2));
+  tube(lpa, chain([split, toWorld(new THREE.Vector3(s(-22), s(32), s(2))), toWorld(hilumL)], 4), s(6.5), 0.15);
   const rpa: Buf = { p: [], ix: [] };
-  tube(rpa, chain([split, toWorld(new THREE.Vector3(s(22), s(44), s(4)))], 3), s(6.5), 0.2);
+  tube(rpa, chain([split, toWorld(new THREE.Vector3(s(18), s(30), s(2))), toWorld(hilumR)], 4), s(6.5), 0.15);
 
   const veinsL: Buf = { p: [], ix: [] };
   const veinsR: Buf = { p: [], ix: [] };
-  tube(veinsL, chain([toWorld(new THREE.Vector3(s(-16), s(36), s(-22))), toWorld(new THREE.Vector3(s(-24), s(40), s(-46)))], 3), s(4.2), 0.05);
-  tube(veinsL, chain([toWorld(new THREE.Vector3(s(-16), s(22), s(-20))), toWorld(new THREE.Vector3(s(-24), s(16), s(-44)))], 3), s(4.2), 0.05);
-  tube(veinsR, chain([toWorld(new THREE.Vector3(s(2), s(36), s(-22))), toWorld(new THREE.Vector3(s(8), s(40), s(-46)))], 3), s(4.2), 0.05);
-  tube(veinsR, chain([toWorld(new THREE.Vector3(s(2), s(22), s(-20))), toWorld(new THREE.Vector3(s(8), s(16), s(-44)))], 3), s(4.2), 0.05);
+  tube(veinsL, chain([toWorld(hilumL.clone().add(new THREE.Vector3(0, s(8), 0))), toWorld(new THREE.Vector3(s(-14), s(34), s(-16)))], 3), s(4.2), 0.05);
+  tube(veinsL, chain([toWorld(hilumL.clone().add(new THREE.Vector3(0, s(-8), 0))), toWorld(new THREE.Vector3(s(-14), s(22), s(-14)))], 3), s(4.2), 0.05);
+  tube(veinsR, chain([toWorld(hilumR.clone().add(new THREE.Vector3(0, s(8), 0))), toWorld(new THREE.Vector3(s(2), s(34), s(-16)))], 3), s(4.2), 0.05);
+  tube(veinsR, chain([toWorld(hilumR.clone().add(new THREE.Vector3(0, s(-8), 0))), toWorld(new THREE.Vector3(s(2), s(22), s(-14)))], 3), s(4.2), 0.05);
 
   const pushTube = (buf: Buf, key: string, label: string, cat: CatId, side: CircPart["side"], blurb: string, drift: THREE.Vector3, weight: number, beat?: CircPart["beat"]) => {
     if (!buf.p.length) return;
@@ -404,8 +416,8 @@ export function buildCirculation(
   };
   pushTube(aorta, "heart:aorta", "Aorta", "arteries", "median", "Leaves the left ventricle behind the pulmonary trunk, arches, and descends along the spine.", D(0.15, 1, -0.35), 0.72);
   pushTube(trunk, "heart:pulmonary", "Pulmonary trunk", "arteries", "median", "Leaves the right ventricle in front of the aorta.", D(-0.1, 0.45, 1), 0.8);
-  pushTube(lpa, "heart:lpa", "Left pulmonary artery", "arteries", "left", "From the pulmonary trunk toward the left lung, which is not shown.", D(-1, 0.35, 0.2), 0.85);
-  pushTube(rpa, "heart:rpa", "Right pulmonary artery", "arteries", "right", "From the pulmonary trunk toward the right lung, which is not shown.", D(1, 0.3, 0.15), 0.85);
+  pushTube(lpa, "heart:lpa", "Left pulmonary artery", "arteries", "left", "From the pulmonary trunk into the hilum of the left lung.", D(-1, 0.35, 0.2), 0.85);
+  pushTube(rpa, "heart:rpa", "Right pulmonary artery", "arteries", "right", "From the pulmonary trunk into the hilum of the right lung.", D(1, 0.3, 0.15), 0.85);
   pushTube(lad, "heart:lad", "Anterior interventricular artery", "arteries", "median", "Runs in the anterior interventricular groove toward the apex. It fills in diastole.", D(-0.2, -0.35, 1), 0.9, "coronary");
   pushTube(circ, "heart:lcx", "Circumflex artery", "arteries", "left", "Runs in the left atrioventricular groove. It fills in diastole.", D(-1, 0.25, -0.15), 0.9, "coronary");
   pushTube(rca, "heart:rca", "Right coronary artery", "arteries", "right", "Runs in the right atrioventricular groove. It fills in diastole.", D(1, 0.1, 0.55), 0.9, "coronary");
@@ -433,6 +445,222 @@ export function buildCirculation(
   pushTube(ivc, "heart:ivc", "Inferior vena cava", "veins", "right", "Enters the floor of the right atrium.", D(0.15, -1, 0.1), 0.7);
   pushTube(azygos, "heart:azygos", "Azygos vein", "veins", "right", "Ascends on the right of the spine and empties into the superior vena cava.", D(0.8, 0.2, -0.2), 0.5);
 
+  const arch = toWorld(new THREE.Vector3(s(-6), s(62), s(-8)));
+  const carotidR: Buf = { p: [], ix: [] };
+  const carotidL: Buf = { p: [], ix: [] };
+  const vertR: Buf = { p: [], ix: [] };
+  const vertL: Buf = { p: [], ix: [] };
+  tube(carotidR, chain([arch, toWorld(new THREE.Vector3(s(10), s(58), s(-4))), at(0.16, 16, 16), targets?.carotidRight ?? at(0.03, 14, 20)], 5), s(5.5), 0.2);
+  tube(carotidL, chain([arch, toWorld(new THREE.Vector3(s(-12), s(64), s(-6))), at(0.14, -16, 16), targets?.carotidLeft ?? at(0.03, -14, 20)], 5), s(5.2), 0.2);
+  tube(vertR, chain([toWorld(new THREE.Vector3(s(16), s(52), s(-10))), at(0.2, 8, -2), at(0.08, 7, -4), targets?.vertebralRight ?? at(0.02, 5, -2)], 5), s(3.4), 0.12);
+  tube(vertL, chain([toWorld(new THREE.Vector3(s(-18), s(50), s(-12))), at(0.2, -8, -2), at(0.08, -7, -4), targets?.vertebralLeft ?? at(0.02, -5, -2)], 5), s(3.4), 0.12);
+  pushTube(carotidR, "heart:carotid-right", "Right common carotid artery", "arteries", "right", "Leaves the brachiocephalic trunk and joins the intracranial internal carotid.", D(0.7, 1, 0.15), 0.75);
+  pushTube(carotidL, "heart:carotid-left", "Left common carotid artery", "arteries", "left", "Leaves the aortic arch and joins the intracranial internal carotid.", D(-0.7, 1, 0.15), 0.75);
+  pushTube(vertR, "heart:vertebral-right", "Right vertebral artery", "arteries", "right", "Climbs the neck and joins the intracranial vertebral artery on its way to the basilar artery.", D(0.35, 1, -0.2), 0.7);
+  pushTube(vertL, "heart:vertebral-left", "Left vertebral artery", "arteries", "left", "Climbs the neck and joins the intracranial vertebral artery on its way to the basilar artery.", D(-0.35, 1, -0.2), 0.7);
+
+  const sinus: Buf = { p: [], ix: [] };
+  const sinusPts: THREE.Vector3[] = [];
+  for (let i = 0; i <= 10; i++) sinusPts.push(toWorld(ventricle(0.84, 0.55 + i * 0.03)));
+  sinusPts.push(toWorld(new THREE.Vector3(s(12), s(20), s(-4))));
+  tube(sinus, chain(sinusPts, 2), s(2.6), 0.15);
+  const great: Buf = { p: [], ix: [] };
+  const greatPts = [toWorld(ventricle(0.35, groove / (Math.PI * 2)))];
+  for (let i = 0; i <= 8; i++) greatPts.push(toWorld(ventricle(0.45 + i * 0.04, groove / (Math.PI * 2) + 0.02)));
+  greatPts.push(sinusPts[0]!);
+  tube(great, chain(greatPts, 2), s(1.8), 0.2);
+  pushTube(sinus, "heart:coronary-sinus", "Coronary sinus", "veins", "median", "The main vein of the heart. It lies in the posterior atrioventricular groove and opens into the right atrium.", D(0.2, 0.15, -1), 0.85);
+  pushTube(great, "heart:great-cardiac", "Great cardiac vein", "veins", "median", "Runs with the anterior interventricular artery, then turns into the coronary sinus.", D(-0.2, 0.1, 0.4), 0.7);
+
+  const trabeculae: Buf = { p: [], ix: [], uv: [] };
+  for (const [u, v] of [
+    [0.35, 0.62],
+    [0.48, 0.7],
+    [0.42, 0.22],
+    [0.55, 0.15],
+    [0.3, 0.08],
+  ] as Array<[number, number]>) {
+    const a = ventricle(u, v);
+    const b = ventricle(Math.min(0.9, u + 0.12), v + 0.02);
+    const n = ventOut(a).normalize();
+    tube(trabeculae, [a.clone().addScaledVector(n, -s(2.2)), b.clone().addScaledVector(n, -s(2.2))], s(1.1), 0.3);
+  }
+  heart(geoOf(trabeculae), "heart:trabeculae", "Trabeculae carneae", "median", "Ridges of muscle on the inner ventricular walls.", "ventricle", D(0, -0.2, 0.15), 0.4);
+
+  const papilla = (atLocal: THREE.Vector3, key: string, label: string, side: CircPart["side"], drift: THREE.Vector3) => {
+    const geo = new THREE.ConeGeometry(s(4.2), s(16), 12, 1);
+    geo.translate(0, s(8), 0);
+    geo.translate(atLocal.x, atLocal.y, atLocal.z);
+    heart(geo, key, label, side, "A papillary muscle on the inner wall. Chordae tendineae run from its tip to an atrioventricular valve.", "ventricle", drift, 0.42);
+  };
+  papilla(new THREE.Vector3(s(-8), s(-6), s(8)), "heart:pap-lv-a", "Anterior papillary muscle, left", "left", D(-0.7, -0.5, 0.3));
+  papilla(new THREE.Vector3(s(-12), s(-4), s(-8)), "heart:pap-lv-p", "Posterior papillary muscle, left", "left", D(-0.8, -0.4, -0.4));
+  papilla(new THREE.Vector3(s(10), s(-2), s(12)), "heart:pap-rv", "Anterior papillary muscle, right", "right", D(0.5, -0.3, 0.8));
+
+  const node = (atLocal: THREE.Vector3, key: string, label: string, blurb: string, drift: THREE.Vector3) => {
+    const geo = new THREE.SphereGeometry(s(1.6), 12, 10);
+    geo.translate(atLocal.x, atLocal.y, atLocal.z);
+    parts.push({ geo, key, label, cat: "heart", side: "median", blurb, beat: "node", center: hub, orient, drift, weight: 0.55, color: "#f4e6b0", plain: true });
+  };
+  node(new THREE.Vector3(s(14), s(40), s(4)), "heart:sa", "Sinus node", "The pacemaker, where the superior vena cava enters the right atrium. It fires at the start of each beat.", D(0.7, 0.8, 0.2));
+  node(new THREE.Vector3(s(2), s(20), s(1)), "heart:avn", "Atrioventricular node", "On the floor of the right atrium. It holds the impulse briefly, then sends it down the septum.", D(0.1, 0.45, 0.1));
+  const bundle: Buf = { p: [], ix: [], uv: [] };
+  tube(bundle, [new THREE.Vector3(s(2), s(20), s(1)), new THREE.Vector3(s(0), s(6), s(1)), new THREE.Vector3(s(-1), s(-16), s(2))], s(1.3), 0.15);
+  tube(bundle, [new THREE.Vector3(s(-1), s(-8), s(2)), new THREE.Vector3(s(-8), s(-28), s(4)), new THREE.Vector3(s(-6), s(-46), s(2))], s(0.9), 0.3);
+  tube(bundle, [new THREE.Vector3(s(0), s(-8), s(2)), new THREE.Vector3(s(7), s(-24), s(8)), new THREE.Vector3(s(8), s(-40), s(10))], s(0.9), 0.3);
+  parts.push({
+    geo: geoOf(bundle),
+    key: "heart:bundle",
+    label: "Atrioventricular bundle",
+    cat: "heart",
+    side: "median",
+    blurb: "From the atrioventricular node down the septum, then as a left and a right bundle toward the ventricular walls.",
+    beat: "node",
+    center: hub,
+    orient,
+    drift: D(0, -0.35, 0.05),
+    weight: 0.36,
+    color: "#e4c8a8",
+    plain: true,
+  });
+
+  addValve(parts, orient, toWorld, s, "aortic", "Aortic valve", "Three cusps. They open on ventricular ejection, with the arterial pulse, and shut as the ventricle relaxes.", new THREE.Vector3(s(2), s(31), s(-2)), 3, "semilunar", -1.05, D(0.1, 1, -0.2), 0.72);
+  addValve(parts, orient, toWorld, s, "pulmonary", "Pulmonary valve", "Three cusps at the right ventricular exit. They open with systole and close in diastole.", new THREE.Vector3(s(-2), s(29), s(15)), 3, "semilunar", -1.05, D(-0.1, 0.5, 1), 0.75);
+  addValve(parts, orient, toWorld, s, "mitral", "Mitral valve", "Two leaflets between the left atrium and the left ventricle. Chordae tether them to the papillary muscles. They close on systole and open while the ventricle refills.", new THREE.Vector3(s(-6), s(16), s(-2)), 2, "av", 1.05, D(-0.6, 0.15, -0.2), 0.7);
+  addValve(parts, orient, toWorld, s, "tricuspid", "Tricuspid valve", "Three leaflets between the right atrium and the right ventricle. They close when the right ventricle contracts.", new THREE.Vector3(s(8), s(14), s(6)), 3, "av", 1.05, D(0.7, 0.1, 0.45), 0.7);
+
+  const sac = shell(
+    24,
+    32,
+    (u, v) => {
+      const p = ventricle(0.05 + u * 0.9, v);
+      p.x *= 1.16;
+      p.z *= 1.18;
+      p.y = p.y * 1.06 + s(8);
+      if (u > 0.72) {
+        const k = (u - 0.72) / 0.28;
+        p.z -= s(12) * k;
+        p.y += s(10) * k;
+      }
+      const fiber = Math.sin(u * 22) * Math.sin(v * Math.PI * 18);
+      const flat = new THREE.Vector3(p.x, 0, p.z);
+      if (flat.lengthSq() > 1e-8) p.addScaledVector(flat.normalize(), s(0.7) * fiber);
+      return p;
+    },
+    s(0.7),
+    (p) => new THREE.Vector3(p.x, p.y * 0.15, p.z),
+  );
+  parts.push({
+    geo: sac,
+    key: "heart:pericardium",
+    label: "Pericardium",
+    cat: "pericardium",
+    side: "median",
+    blurb: "The sac around the heart. Explode lifts it off the chambers.",
+    center: hub,
+    orient,
+    drift: D(0, 0.35, 1),
+    weight: 1.45,
+  });
+
+  const lungPoint = (sideSign: 1 | -1, u: number, v: number, inflate = 1) => {
+    const ang = v * Math.PI * 2;
+    const belly = Math.sin(Math.pow(u, 0.7) * Math.PI * 0.94);
+    const baseFlat = u > 0.84 ? THREE.MathUtils.lerp(1, 0.42, (u - 0.84) / 0.16) : 1;
+    const lateral = sideSign > 0 ? 40 : 32;
+    let rx = s(lateral * (0.2 + 0.8 * Math.pow(Math.max(u, 0.04), 0.42)) * (0.5 + 0.5 * belly) * baseFlat) * inflate;
+    let rz = s(28 * (0.26 + 0.74 * Math.pow(Math.max(u, 0.04), 0.48)) * baseFlat) * inflate;
+    const towardMid = Math.max(0, -sideSign * Math.cos(ang));
+    rx *= 1 - 0.34 * towardMid * Math.sin(Math.min(1, u * 1.15) * Math.PI);
+    const hilum = Math.exp(-((u - 0.4) ** 2) / 0.004) * towardMid;
+    rx *= 1 - 0.22 * hilum;
+    const cx = sideSign * s(sideSign > 0 ? 20 : 16);
+    let x = cx + Math.cos(ang) * rx;
+    let z = Math.sin(ang) * rz - s(4);
+    let y = s(THREE.MathUtils.lerp(72, -50, Math.pow(u, 0.9)));
+    if (u > 0.9) y = s(THREE.MathUtils.lerp(-36, -50, (u - 0.9) / 0.1));
+    const lob = Math.sin(ang * 8 + u * 6) * Math.sin(u * 13);
+    x += s(0.55) * lob;
+    z += s(0.45) * lob;
+    return new THREE.Vector3(x, y, z);
+  };
+  const band = (sideSign: 1 | -1, u0: number, u1: number, v0 = 0, v1 = 1) =>
+    surface(14, 24, (u, v) => lungPoint(sideSign, THREE.MathUtils.lerp(u0, u1, u), THREE.MathUtils.lerp(v0, v1, v)));
+  const placeLung = (geo: THREE.BufferGeometry, key: string, label: string, side: CircPart["side"], blurb: string, drift: THREE.Vector3, weight: number, cat: CatId = "lungs") => {
+    parts.push({ geo, key, label, cat, side, blurb, center: hub, orient, drift, weight });
+  };
+  placeLung(band(1, 0.02, 0.4), "heart:rul", "Right upper lobe", "right", "Above the horizontal fissure. The apical bronchus enters it from the hilum.", D(1, 0.9, 0.2), 1);
+  placeLung(band(1, 0.34, 0.6, 0.02, 0.48), "heart:rml", "Right middle lobe", "right", "The small anterior lobe between the horizontal and oblique fissures.", D(0.7, 0.05, 1), 1.05);
+  placeLung(band(1, 0.52, 0.98), "heart:rll", "Right lower lobe", "right", "Below the oblique fissure, sitting on the diaphragm.", D(0.8, -0.75, -0.25), 1);
+  placeLung(band(-1, 0.02, 0.52), "heart:lul", "Left upper lobe", "left", "Includes the lingula. The cardiac notch is on its medial side.", D(-1, 0.85, 0.25), 1);
+  placeLung(band(-1, 0.46, 0.98), "heart:lll", "Left lower lobe", "left", "Below the oblique fissure, against the diaphragm.", D(-0.85, -0.7, -0.2), 1);
+  placeLung(
+    surface(18, 28, (u, v) => lungPoint(1, 0.02 + u * 0.96, v, 1.08)),
+    "heart:pleura-right",
+    "Right pleura",
+    "right",
+    "The sac around the right lung. Explode lifts it off the three lobes.",
+    D(1.1, 0.1, -0.1),
+    1.35,
+    "pleura",
+  );
+  placeLung(
+    surface(18, 28, (u, v) => lungPoint(-1, 0.02 + u * 0.96, v, 1.08)),
+    "heart:pleura-left",
+    "Left pleura",
+    "left",
+    "The sac around the left lung. Explode lifts it off the two lobes.",
+    D(-1.1, 0.1, -0.1),
+    1.35,
+    "pleura",
+  );
+
+  const diaphragm = shell(
+    18,
+    14,
+    (u, v) => {
+      const x = THREE.MathUtils.lerp(s(-102), s(102), u);
+      const z = THREE.MathUtils.lerp(s(-62), s(46), v);
+      const rightDome = Math.exp(-((u - 0.68) ** 2) / 0.018 - (v - 0.46) ** 2 / 0.04);
+      const leftDome = Math.exp(-((u - 0.3) ** 2) / 0.016 - (v - 0.44) ** 2 / 0.042);
+      const tendon = Math.exp(-((u - 0.5) ** 2) / 0.01 - (v - 0.5) ** 2 / 0.02);
+      const y = s(-64) + rightDome * s(28) + leftDome * s(22) + tendon * s(4);
+      return new THREE.Vector3(x, y, z);
+    },
+    s(3.2),
+    () => new THREE.Vector3(0, 1, 0),
+  );
+  parts.push({
+    geo: diaphragm,
+    key: "heart:diaphragm",
+    label: "Diaphragm",
+    cat: "diaphragm",
+    side: "median",
+    blurb: "Two domes under the lungs and a central tendon under the heart. It flattens as the lungs fill. The phrenic nerves supply it.",
+    center: hub,
+    orient,
+    drift: D(0, -1, 0.1),
+    weight: 0.85,
+  });
+
+  const carina = toWorld(new THREE.Vector3(0, s(50), s(4)));
+  const trachea: Buf = { p: [], ix: [] };
+  tube(trachea, chain([at(0.05, 0, 16), at(0.14, 0, 18), toWorld(new THREE.Vector3(0, s(78), s(8))), carina], 5), s(8), 0.12);
+  const rightTree: Buf = { p: [], ix: [] };
+  const rHilum = toWorld(new THREE.Vector3(s(24), s(14), s(-2)));
+  tube(rightTree, chain([carina, toWorld(new THREE.Vector3(s(12), s(34), s(2))), rHilum], 4), s(6), 0.08);
+  tube(rightTree, chain([rHilum, toWorld(lungPoint(1, 0.22, 0.25))], 3), s(3.1), 0.35);
+  tube(rightTree, chain([rHilum, toWorld(lungPoint(1, 0.46, 0.2))], 3), s(2.5), 0.35);
+  tube(rightTree, chain([rHilum, toWorld(lungPoint(1, 0.72, 0.55))], 3), s(3), 0.35);
+  const leftTree: Buf = { p: [], ix: [] };
+  const lHilum = toWorld(new THREE.Vector3(s(-28), s(12), s(-4)));
+  tube(leftTree, chain([carina, toWorld(new THREE.Vector3(s(-16), s(36), s(2))), lHilum], 4), s(5.2), 0.12);
+  tube(leftTree, chain([lHilum, toWorld(lungPoint(-1, 0.28, 0.3))], 3), s(2.8), 0.35);
+  tube(leftTree, chain([lHilum, toWorld(lungPoint(-1, 0.7, 0.55))], 3), s(2.8), 0.35);
+  pushTube(trachea, "heart:trachea", "Trachea", "airway", "median", "The airway in the neck and superior mediastinum. It ends at the carina.", D(0, 0.8, 0.35), 0.65);
+  pushTube(rightTree, "heart:bronchi-right", "Right bronchi", "airway", "right", "A short steep main bronchus, then bronchi to the upper, middle, and lower lobes.", D(1, 0.15, 0.2), 0.8);
+  pushTube(leftTree, "heart:bronchi-left", "Left bronchi", "airway", "left", "A longer main bronchus, then bronchi to the upper and lower lobes.", D(-1, 0.15, 0.15), 0.8);
+
   return parts;
 }
 function auricle(s: (n: number) => number, side: 1 | -1) {
@@ -449,4 +677,77 @@ function auricle(s: (n: number) => number, side: 1 | -1) {
       .addScaledVector(n2, Math.cos(ang) * rad * 1.35)
       .addScaledVector(n3, Math.sin(ang) * rad * 0.5);
   });
+}
+
+function leaflet(outer: number, inner: number, chord: number) {
+  const cusp = shell(
+    8,
+    10,
+    (u, v) => {
+      const across = (v - 0.5) * outer * (1 - u * 0.62);
+      const y = THREE.MathUtils.lerp(outer, inner, u);
+      const billow = Math.sin(u * Math.PI) * Math.sin(v * Math.PI) * outer * 0.16;
+      return new THREE.Vector3(across, y, billow);
+    },
+    Math.max(outer * 0.035, 0.0004),
+    () => new THREE.Vector3(0, 0, 1),
+  );
+  if (chord <= 0) return cusp;
+  const buf: Buf = { p: [], ix: [], uv: [] };
+  for (const x of [-0.28, 0, 0.28]) {
+    tube(
+      buf,
+      chain(
+        [
+          new THREE.Vector3(x * outer, inner + (outer - inner) * 0.08, 0),
+          new THREE.Vector3(x * outer * 0.35, inner - chord * 0.45, 0),
+          new THREE.Vector3(0, inner - chord, 0),
+        ],
+        4,
+      ),
+      outer * 0.018,
+      0.35,
+    );
+  }
+  return merge([cusp, geoOf(buf)]);
+}
+
+function addValve(
+  parts: CircPart[],
+  orient: THREE.Quaternion,
+  toWorld: (p: THREE.Vector3) => THREE.Vector3,
+  s: (n: number) => number,
+  id: string,
+  label: string,
+  blurb: string,
+  centerLocal: THREE.Vector3,
+  count: number,
+  beat: "semilunar" | "av",
+  openAngle: number,
+  drift: THREE.Vector3,
+  weight: number,
+) {
+  const center = toWorld(centerLocal);
+  const outer = s(beat === "av" ? 14 : 10);
+  const inner = s(beat === "av" ? 3 : 2);
+  const chord = beat === "av" ? s(14) : 0;
+  for (let i = 0; i < count; i++) {
+    const spin = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (i / count) * Math.PI * 2);
+    parts.push({
+      geo: leaflet(outer, inner, chord),
+      key: `heart:${id}:${i}`,
+      label,
+      cat: "heart",
+      side: id === "tricuspid" || id === "pulmonary" ? "right" : "left",
+      blurb,
+      beat,
+      center,
+      orient: orient.clone().multiply(spin),
+      openAngle,
+      drift,
+      weight,
+      color: "#f6ebe4",
+      plain: true,
+    });
+  }
 }
