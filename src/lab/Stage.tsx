@@ -24,7 +24,7 @@ import { VIEW_BY_ID } from "./views";
 import { applyHeartMap, applyLungMap, applyPericardiumMap, applyRepeating, applySpinalUv, applyTriplanar, nerveMaterial, tissueTextures } from "./textures";
 import { buildPeripheral } from "./nerves";
 import { buildCirculation } from "./heart";
-import { buildHeadNeck } from "./neck";
+import { buildHeadNeck, type ChestSlice } from "./neck";
 
 type Side = "left" | "right" | "median";
 
@@ -1085,6 +1085,66 @@ function frameRegion(frame: Frame, cats: string[], explode: number, retract: num
   if (_view.lengthSq() < 1e-8) _view.copy(frame.anterior);
   _view.normalize();
   return { cam: target.clone().addScaledVector(_view, dist), target };
+}
+
+function measureChest(
+  records: Rec[],
+  origin: THREE.Vector3,
+  superior: THREE.Vector3,
+  anterior: THREE.Vector3,
+  right: THREE.Vector3,
+  unitToMm: number,
+): ChestSlice[] {
+  const samples: { down: number; ant: number; lat: number; shell: boolean }[] = [];
+  const p = new THREE.Vector3();
+  for (const rec of records) {
+    const shell = rec.cat === "lungs" || rec.cat === "pleura" || rec.cat === "diaphragm";
+    const heart = rec.cat === "heart" && !rec.key.startsWith("heart:fat");
+    if (!shell && !heart) continue;
+    const attr = rec.mesh.geometry.getAttribute("position");
+    if (!attr) continue;
+    const step = Math.max(1, Math.floor(attr.count / 320));
+    for (let i = 0; i < attr.count; i += step) {
+      p.fromBufferAttribute(attr as THREE.BufferAttribute, i);
+      p.applyQuaternion(rec.mesh.quaternion).add(rec.mesh.position).sub(origin);
+      samples.push({
+        down: -p.dot(superior) * unitToMm,
+        ant: p.dot(anterior) * unitToMm,
+        lat: p.dot(right) * unitToMm,
+        shell,
+      });
+    }
+  }
+  const organs = samples.filter((sample) => sample.shell);
+  if (organs.length < 30) return [];
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const sample of organs) {
+    lo = Math.min(lo, sample.down);
+    hi = Math.max(hi, sample.down);
+  }
+  const count = 12;
+  const band = ((hi - lo) / count) * 0.72;
+  const slices: ChestSlice[] = [];
+  for (let i = 0; i < count; i++) {
+    const down = lo + ((i + 0.5) / count) * (hi - lo);
+    let back = Infinity;
+    let front = -Infinity;
+    let half = 0;
+    let n = 0;
+    for (const sample of samples) {
+      if (Math.abs(sample.down - down) > band) continue;
+      if (sample.shell) {
+        back = Math.min(back, sample.ant);
+        half = Math.max(half, Math.abs(sample.lat));
+        n += 1;
+      }
+      front = Math.max(front, sample.ant);
+    }
+    if (n < 4 || !Number.isFinite(back) || !Number.isFinite(front)) continue;
+    slices.push({ down, back, front, half });
+  }
+  return slices;
 }
 
 function visualTarget(rec: Rec, frame: Frame, explode: number, retract: number, excised: string[], out: THREE.Vector3) {
@@ -2277,6 +2337,7 @@ function Specimen() {
                 }
                 return m;
               };
+              const chest = measureChest(records, neckOrigin, superior, anterior, rightAxis, unitToMm);
               for (const part of buildHeadNeck({
                 center,
                 origin: neckOrigin,
@@ -2288,6 +2349,7 @@ function Specimen() {
                 halfSup: along(superior),
                 halfAnt: along(anterior),
                 globes,
+                chest,
               })) {
                 const color = new THREE.Color(part.color ?? CAT_BY_ID[part.cat].color);
                 const mat = makeMaterial(part.cat, color.clone(), part.label.length);

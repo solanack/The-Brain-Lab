@@ -89,6 +89,8 @@ function vault(center: THREE.Vector3, superior: THREE.Vector3, anterior: THREE.V
   return geo;
 }
 
+export type ChestSlice = { down: number; back: number; front: number; half: number };
+
 export function buildHeadNeck(opts: {
   center: THREE.Vector3;
   origin: THREE.Vector3;
@@ -100,6 +102,7 @@ export function buildHeadNeck(opts: {
   halfSup: number;
   halfAnt: number;
   globes: { side: "left" | "right"; at: THREE.Vector3 }[];
+  chest?: ChestSlice[];
 }) {
   const { center, origin, superior, anterior, right, unitToMm } = opts;
   const mm = (n: number) => n / unitToMm;
@@ -217,7 +220,30 @@ export function buildHeadNeck(opts: {
     push(bar(symph, hyoidS, mm(2.6), mm(1.8), 5), `hn:suprahyoid:${side}`, "Suprahyoid muscles", "hn_muscle", side, "Digastric, mylohyoid, and geniohyoid, as one group. They raise the hyoid. The marginal mandibular branch crosses the digastric.", anterior.clone().add(superior).normalize(), "#b0645c");
 
     const mastoid = origin.clone().addScaledVector(lat, mm(48)).addScaledVector(anterior, mm(-4)).addScaledVector(superior, mm(2));
-    const sternum = neck(128, 148, s(22));
+    const fitted = opts.chest && opts.chest.length > 2 ? opts.chest : null;
+    const sliceAt = (down: number) => {
+      const rows = fitted ?? [];
+      if (!rows.length) return null;
+      if (down <= rows[0]!.down) return rows[0]!;
+      const last = rows[rows.length - 1]!;
+      if (down >= last.down) return last;
+      for (let i = 0; i < rows.length - 1; i++) {
+        const a = rows[i]!;
+        const b = rows[i + 1]!;
+        if (down > b.down) continue;
+        const t = (down - a.down) / Math.max(1, b.down - a.down);
+        return {
+          down,
+          back: THREE.MathUtils.lerp(a.back, b.back, t),
+          front: THREE.MathUtils.lerp(a.front, b.front, t),
+          half: THREE.MathUtils.lerp(a.half, b.half, t),
+        };
+      }
+      return last;
+    };
+    const gate = sliceAt(fitted ? fitted[0]!.down + 12 : 124);
+    const sternum = gate ? neck(gate.down, gate.front + 18, s(20)) : neck(128, 148, s(22));
+    const rib = gate ? neck(gate.down + 6, (gate.back + gate.front) * 0.5, s(gate.half + 16)) : neck(124, 24, s(72));
     push(bar(mastoid, sternum, mm(5.5), mm(3.2), 8), `hn:scm:${side}`, "Sternocleidomastoid", "hn_muscle", side, "From the mastoid to the sternum and clavicle. It divides the neck into anterior and posterior triangles. The accessory nerve enters its deep face.", lat, "#a85850");
 
     const nuchal = origin.clone().addScaledVector(anterior, mm(-18)).addScaledVector(superior, mm(8)).addScaledVector(lat, mm(8));
@@ -225,7 +251,6 @@ export function buildHeadNeck(opts: {
     push(bar(nuchal, trap, mm(6), mm(3), 7), `hn:trapezius:${side}`, "Trapezius", "hn_muscle", side, "The upper fibers form the posterior border of the posterior triangle. The accessory nerve runs on the deep surface.", lat.clone().add(inferior).normalize(), "#9c524c");
 
     const tubercle = neck(48, -2, s(24));
-    const rib = neck(124, 24, s(72));
     push(bar(tubercle, rib, mm(3.4), mm(2.4), 6), `hn:scalene:${side}`, "Scalene muscles", "hn_muscle", side, "Anterior and middle scalene, as one strap. The brachial plexus and the subclavian artery pass between them.", lat, "#965048");
 
     const smf = mastoid.clone().addScaledVector(anterior, mm(8)).addScaledVector(inferior, mm(4));
@@ -363,60 +388,103 @@ export function buildHeadNeck(opts: {
     geo.translate(c.x, c.y, c.z);
     return geo;
   };
-  const tDown = (i: number) => 116 + i * 18.5;
   const bone = "#e4d5c2";
+  const rows = fittedSpine(opts.chest);
+  const level = (i: number) => {
+    const row = rows[Math.min(rows.length - 1, Math.round((i / 11) * (rows.length - 1)))] ?? rows[0]!;
+    return row;
+  };
   for (let i = 0; i < 12; i++) {
-    const down = tDown(i);
-    const body = neck(down, -10, 0);
-    const spinous = neck(down + 4 + i * 0.35, -28, 0);
+    const row = level(i);
+    const body = neck(row.down, row.back - 16, 0);
+    const spinous = neck(row.down + 5, row.back - 34, 0);
     push(
-      merge([ball(body, mm(15 + i * 0.35), mm(8), mm(13), 8), bar(body, spinous, mm(3.4), mm(2.4), 5)]),
+      merge([ball(body, mm(14 + i * 0.3), mm(7.5), mm(12), 8), bar(body, spinous, mm(3.2), mm(2.2), 5)]),
       `cage:t${i + 1}`,
       `Thoracic vertebra T${i + 1}`,
       "cage",
       "median",
       i === 0
-        ? "Continues the cervical spine. Rib 1 articulates here. The lung apex rises above this level."
+        ? "Continues the cervical spine. Rib 1 articulates here. The lung apex rises just above this level."
         : i === 11
-          ? "The last thoracic vertebra. The diaphragm crura attach near here, below the dome."
-          : `Vertebral body and a downward spinous process. Rib ${i + 1} articulates with it. The spinal nerve leaves under the pedicle.`,
+          ? "The last thoracic vertebra, behind the diaphragm. Rib 12 articulates here."
+          : `Vertebral body behind the lung. Rib ${i + 1} articulates with it. The spinal nerve leaves under the pedicle.`,
       anterior.clone().negate(),
       bone,
     );
   }
-  push(plate(neck(134, 150, 0), mm(52), mm(40), mm(12)), "cage:manubrium", "Manubrium", "cage", "median", "The upper sternum. The clavicles and the first ribs meet it. The jugular notch is the top edge.", anterior, bone);
-  push(plate(neck(198, 154, 0), mm(34), mm(92), mm(10)), "cage:sternum", "Sternal body", "cage", "median", "Ribs 2–7 reach it through their costal cartilages. The right ventricle lies immediately behind it.", anterior, bone);
-  push(plate(neck(256, 148, 0), mm(16), mm(26), mm(7)), "cage:xiphoid", "Xiphoid process", "cage", "median", "The small tip of the sternum. The costal margin meets it. The diaphragm attaches to its back.", anterior, bone);
+  const sternal = (i: number) => level(i);
+  const manu = sternal(1);
+  const bodyRow = sternal(4);
+  const xiph = sternal(8);
+  push(plate(neck(manu.down, manu.front + 20, 0), mm(48), mm(Math.max(28, (sternal(2).down - manu.down) * 1.3)), mm(10)), "cage:manubrium", "Manubrium", "cage", "median", "The upper sternum, just in front of the great vessels. The clavicles and the first ribs meet it.", anterior, bone);
+  push(plate(neck(bodyRow.down, bodyRow.front + 22, 0), mm(30), mm(Math.max(48, (sternal(7).down - sternal(2).down))), mm(9)), "cage:sternum", "Sternal body", "cage", "median", "Ribs 2–7 reach it. The right ventricle lies immediately behind this bone.", anterior, bone);
+  push(plate(neck(xiph.down + 12, xiph.front + 16, 0), mm(14), mm(22), mm(6)), "cage:xiphoid", "Xiphoid process", "cage", "median", "The tip of the sternum. The costal margin meets it. The diaphragm attaches to its back.", anterior, bone);
 
   for (const sign of [1, -1] as const) {
     const side = sign > 0 ? "right" : "left";
     const s = (n: number) => n * sign;
     const lat = right.clone().multiplyScalar(sign);
+    const top = sternal(0);
     const clav = merge([
-      bar(neck(126, 146, s(24)), neck(114, 96, s(78)), mm(6), mm(5.2), 7),
-      bar(neck(114, 96, s(78)), neck(132, 16, s(148)), mm(5.2), mm(4.4), 7),
+      bar(neck(top.down, top.front + 18, s(22)), neck(top.down - 10, (top.back + top.front) * 0.5, s(top.half * 0.62)), mm(5.6), mm(5), 6),
+      bar(neck(top.down - 10, (top.back + top.front) * 0.5, s(top.half * 0.62)), neck(top.down + 2, top.back + 8, s(top.half + 20)), mm(5), mm(4.2), 6),
     ]);
-    push(clav, `cage:clavicle:${side}`, "Clavicle", "cage", side, "From the manubrium to the shoulder. The subclavian vessels and the brachial plexus pass behind its medial third.", lat.clone().add(superior).normalize(), bone);
+    push(clav, `cage:clavicle:${side}`, "Clavicle", "cage", side, "From the manubrium across the thoracic inlet to the shoulder. It stays above the lung apex. The subclavian vessels pass behind its medial third.", lat.clone().add(superior).normalize(), bone);
     for (let i = 0; i < 12; i++) {
-      const headDown = tDown(i);
-      const drop = 4 + i * 2.6;
-      const reach = [74, 102, 124, 140, 152, 154, 146, 136, 122, 104, 78, 58][i]!;
-      const frontAnt = i < 7 ? 150 : i < 10 ? 128 - (i - 7) * 16 : 36;
-      const frontLat = i < 7 ? 18 : i < 10 ? 36 + (i - 7) * 10 : reach * 0.85;
-      const head = neck(headDown, -4, s(16));
-      const angle = neck(headDown + drop * 0.28, -22, s(reach * 0.62));
-      const shaft = neck(headDown + drop * 0.62, 28, s(reach));
-      const end = neck(headDown + drop, frontAnt, s(frontLat));
-      const thick = i === 0 ? 5.5 : 4.2;
+      const row = level(i);
+      const mid = (row.back + row.front) * 0.5;
+      const rAnt = (row.front - row.back) * 0.5 + 16;
+      const rLat = row.half + 16;
+      const steps = i >= 10 ? 4 : 6;
+      const start = Math.PI * 0.86;
+      const end = i >= 10 ? Math.PI * 0.48 : i >= 7 ? Math.PI * 0.22 : Math.PI * 0.08;
+      const pts: THREE.Vector3[] = [];
+      for (let k = 0; k < steps; k++) {
+        const t = k / (steps - 1);
+        const theta = THREE.MathUtils.lerp(start, end, t);
+        const drop = (3 + i * 1.7) * t;
+        pts.push(neck(row.down + drop, mid + Math.cos(theta) * rAnt, s(Math.sin(theta) * rLat)));
+      }
+      if (i < 7) pts[pts.length - 1] = neck(row.down + 3 + i * 1.7, row.front + 18, s(i === 0 ? 22 : 12));
+      const geos: THREE.BufferGeometry[] = [];
+      for (let k = 0; k < pts.length - 1; k++) {
+        const thick = (i === 0 ? 5.2 : 4) * (1 - k * 0.08);
+        geos.push(bar(pts[k]!, pts[k + 1]!, mm(thick), mm(Math.max(2.4, thick * 0.82)), 5));
+      }
       const note =
         i < 7
-          ? `True rib. The shaft runs outside the lung and the anterior end is costal cartilage reaching the sternum. The intercostal nerve and vessels sit in the groove under the shaft.`
+          ? "True rib. It arcs outside the lung and its cartilage reaches the sternum. The intercostal nerve runs in the groove under the shaft."
           : i < 10
-            ? "Joins the costal margin rather than the sternum. The intercostal nerve runs under the shaft."
-            : "Floating rib. It ends in the body wall and does not reach the sternum.";
-      push(merge([bar(head, angle, mm(thick), mm(thick * 0.85), 5), bar(angle, shaft, mm(thick * 0.85), mm(3.4), 5), bar(shaft, end, mm(3.4), mm(2.6), 5)]), `cage:rib${i + 1}:${side}`, `Rib ${i + 1}`, "cage", side, note, lat, bone);
+            ? "Joins the costal margin rather than the sternum. The shaft stays outside the lung."
+            : "Floating rib. It ends in the body wall, short of the front, outside the lung base.";
+      push(merge(geos), `cage:rib${i + 1}:${side}`, `Rib ${i + 1}`, "cage", side, note, lat, bone);
     }
   }
 
   return parts;
+}
+
+function fittedSpine(chest?: ChestSlice[]) {
+  if (!chest || chest.length < 3) {
+    return Array.from({ length: 12 }, (_, i) => ({ down: 116 + i * 18.5, back: -10, front: 150, half: 120 }));
+  }
+  const smooth = chest.map((row, i) => {
+    const a = chest[Math.max(0, i - 1)]!;
+    const b = chest[Math.min(chest.length - 1, i + 1)]!;
+    return {
+      down: row.down,
+      back: (a.back + row.back + b.back) / 3,
+      front: (a.front + row.front + b.front) / 3,
+      half: (a.half + row.half + b.half) / 3,
+    };
+  });
+  return Array.from({ length: 12 }, (_, i) => {
+    const t = i / 11;
+    const down = THREE.MathUtils.lerp(smooth[0]!.down + 8, smooth[smooth.length - 1]!.down, t);
+    let hit = smooth[0]!;
+    for (const row of smooth) if (Math.abs(row.down - down) < Math.abs(hit.down - down)) hit = row;
+    const taper = i >= 10 ? 0.94 : 1;
+    return { down, back: hit.back, front: hit.front, half: hit.half * taper };
+  });
 }
