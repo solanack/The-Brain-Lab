@@ -13,7 +13,8 @@ import {
   SunMedium,
   X,
 } from "lucide-react";
-import { CATEGORIES, GROUPS, RECIPES, TOURS, type CatId, type SampleId, type TourId } from "./data";
+import { CATEGORIES, GROUPS, RECIPES, type CatId, type SampleId } from "./data";
+import { SCENARIOS, SCENARIO_BY_ID, scenarioHit, type ScenarioId } from "./scenarios";
 import { useLab, type Axis } from "./store";
 
 function Meter({
@@ -100,7 +101,7 @@ export function Chrome() {
       if (event.key === "m" || event.key === "M") state.patch({ measuring: !state.measuring, measure: [] });
       if (event.key === "s" || event.key === "S") state.patch({ sectionOn: !state.sectionOn });
       if (event.key === "f" || event.key === "F") focusSelection();
-      if (event.key === "Escape") state.patch({ measuring: false, measure: [], selected: null, sheet: null, tour: null });
+      if (event.key === "Escape") closeModule();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -205,9 +206,8 @@ export function Chrome() {
 
 function TourBar() {
   const tour = useLab((s) => s.tour);
-  const patch = useLab((s) => s.patch);
   if (!tour) return null;
-  const spec = TOURS[tour.id];
+  const spec = SCENARIO_BY_ID[tour.id];
   const stop = spec.stops[tour.index];
   if (!stop) return null;
   const last = tour.index >= spec.stops.length - 1;
@@ -218,27 +218,29 @@ function TourBar() {
         <span className="ml-auto font-mono text-xs text-muted tabular-nums">
           {tour.index + 1}/{spec.stops.length}
         </span>
-        <button type="button" className="flex size-11 items-center justify-center" aria-label="Close tour" onClick={() => patch({ tour: null })}>
+        <button type="button" className="flex size-11 items-center justify-center" aria-label="Close tour" onClick={closeModule}>
           <X className="size-4" />
         </button>
       </div>
-      <h2 className="text-sm font-semibold">{stop.title}</h2>
+      <p className="text-sm text-muted">{spec.note}</p>
+      <h2 className="mt-2 text-sm font-semibold">{stop.title}</h2>
       <p className="mt-1 text-sm text-muted">{stop.note}</p>
+      <p className="mt-1 text-sm text-muted">{stop.loss ? "Downstream of this cut is dark." : "Nothing further in this specimen goes dark."}</p>
       <div className="mt-2 flex gap-2">
         <button
           type="button"
           className="h-11 flex-1 rounded-full bg-surface-2 text-sm disabled:opacity-40"
           disabled={tour.index === 0}
-          onClick={() => patch({ tour: { id: tour.id, index: tour.index - 1 } })}
+          onClick={() => useLab.getState().patch({ tour: { id: tour.id, index: tour.index - 1 } })}
         >
           Back
         </button>
         <button
           type="button"
           className="h-11 flex-1 rounded-full bg-primary text-sm text-primary-fg"
-          onClick={() => patch(last ? { tour: null } : { tour: { id: tour.id, index: tour.index + 1 } })}
+          onClick={() => (last ? closeModule() : useLab.getState().patch({ tour: { id: tour.id, index: tour.index + 1 } }))}
         >
-          {last ? "Done" : "Next"}
+          {last ? "Anatomy" : "Next"}
         </button>
       </div>
     </div>
@@ -272,60 +274,37 @@ function openSample(id: SampleId) {
   state.request({ type: "sample" });
 }
 
-function beginTour(id: TourId) {
+function closeModule() {
   const state = useLab.getState();
-  const hidden = { ...state.hidden };
-  const visible = { ...state.visible };
-  const opacity = { ...state.opacity };
-  if (id === "visual") {
-    for (const item of state.directory) {
-      if (item.cat === "cranial_nerves") hidden[item.key] = !/optic|chiasm/i.test(item.label);
-      if (item.cat === "tracts") hidden[item.key] = !/optic radiation/i.test(item.label);
-      if (item.cat === "globe" || item.cat === "orbit") hidden[item.key] = false;
-    }
-    Object.assign(opacity, {
-      cortex: 0.14,
-      white_matter: 0.08,
-      cerebellum: 0.06,
-      brainstem: 0.4,
-      diencephalon: 0.28,
-      globe: 1,
-      orbit: 1,
-      cranial_nerves: 1,
-      tracts: 0.85,
-      dura: 0.04,
-      arachnoid: 0.04,
-    });
-    visible.globe = true;
-    visible.orbit = true;
-    visible.cranial_nerves = true;
-    visible.tracts = true;
-  } else {
-    for (const item of state.directory) {
-      if (item.cat === "tracts") hidden[item.key] = !/corticospinal/i.test(item.label);
-      if (item.cat === "cranial_nerves") hidden[item.key] = true;
-    }
-    Object.assign(opacity, {
-      cortex: 0.16,
-      white_matter: 0.12,
-      cerebellum: 0.08,
-      brainstem: 0.72,
-      spinal_cord: 1,
-      tracts: 1,
-      dura: 0.04,
-      arachnoid: 0.04,
-    });
-    visible.tracts = true;
-    visible.spinal_cord = true;
-    visible.brainstem = true;
-    visible.cortex = true;
-  }
   state.patch({
-    hidden,
-    visible,
-    opacity,
+    scenario: null,
+    tour: null,
+    opacity: state.restoreOpacity ?? state.opacity,
+    restoreOpacity: null,
+    measuring: false,
+    measure: [],
+    selected: null,
+    sheet: null,
+  });
+}
+
+function openModule(id: ScenarioId) {
+  const state = useLab.getState();
+  const spec = SCENARIO_BY_ID[id];
+  const visible = { ...state.visible };
+  for (const cat of spec.show) visible[cat] = true;
+  const hidden = { ...state.hidden };
+  for (const item of state.directory) {
+    if (scenarioHit(item.label, item.cat, spec)) hidden[item.key] = false;
+  }
+  const restoreOpacity = state.restoreOpacity ?? { ...state.opacity };
+  state.patch({
+    scenario: id,
     tour: { id, index: 0 },
-    explode: id === "visual" ? 0.2 : 0.12,
+    visible,
+    hidden,
+    opacity: { ...(state.restoreOpacity ?? state.opacity), ...spec.fade },
+    restoreOpacity,
     isolated: null,
     sectionOn: false,
     sheet: null,
@@ -477,8 +456,8 @@ function Layers() {
         >
           Nerves
         </Pill>
-        <Pill onClick={() => beginTour("visual")}>Visual pathway</Pill>
-        <Pill onClick={() => beginTour("corticospinal")}>Corticospinal</Pill>
+        <Pill onClick={() => openModule("see")}>Visual pathway</Pill>
+        <Pill onClick={() => openModule("reach")}>Corticospinal</Pill>
         <Pill
           onClick={() =>
             useLab.getState().patch({
@@ -753,8 +732,10 @@ function Tools() {
   const depth = useLab((s) => s.depth);
   const measuring = useLab((s) => s.measuring);
   const sheet = useLab((s) => s.sheet);
+  const scenario = useLab((s) => s.scenario);
   const patch = useLab((s) => s.patch);
   const axes: Axis[] = ["axial", "coronal", "sagittal"];
+  const setScenario = (id: ScenarioId | null) => (id ? openModule(id) : closeModule());
   return (
     <>
       <div className="w-36 shrink-0">
@@ -780,6 +761,14 @@ function Tools() {
           Measure
         </span>
       </Pill>
+      <Pill active={scenario === null} onClick={() => setScenario(null)}>
+        Anatomy
+      </Pill>
+      {SCENARIOS.map((item) => (
+        <Pill key={item.id} active={scenario === item.id} onClick={() => setScenario(item.id)}>
+          {item.title}
+        </Pill>
+      ))}
       <Pill
         onClick={() => {
           patch({ tissue: true, sheet: "dossier" });

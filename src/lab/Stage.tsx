@@ -11,7 +11,6 @@ import {
   CAT_IDS,
   RECIPES,
   RECIPE_BY_ID,
-  TOURS,
   pearlFor,
   type CatId,
   type Recipe,
@@ -19,6 +18,7 @@ import {
   type Stratum,
 } from "./data";
 import { useLab, type Axis, type Meta } from "./store";
+import { SCENARIO_BY_ID, circuitLinks, lostToCut, scenarioHit, type ModuleStop } from "./scenarios";
 import { applyRepeating, applySpinalUv, applyTriplanar, tissueTextures } from "./textures";
 
 type Side = "left" | "right" | "median";
@@ -70,6 +70,9 @@ const Y_UP = new THREE.Vector3(0, 1, 0);
 const _desired = new THREE.Vector3();
 const _pos = new THREE.Vector3();
 const _view = new THREE.Vector3();
+const SCENARIO_GOLD = new THREE.Color("#a86848");
+const SCENARIO_ASH = new THREE.Color("#6a6560");
+const CUT_DEAD = new THREE.Color("#5a534c");
 const WARM = new THREE.Color("#ffd2b4");
 const COOL = new THREE.Color("#dce9ff");
 const CLIP = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
@@ -772,7 +775,77 @@ function MeasureReadout({ unitToMm }: { unitToMm: number }) {
   );
 }
 
-function pointAlong(rec: Rec, superior: THREE.Vector3, t: number) {
+function findStop(records: Rec[], stop: ModuleStop, superior: THREE.Vector3, anterior: THREE.Vector3, right: THREE.Vector3) {
+  const hits = records.filter((item) => {
+    if (stop.side && item.side !== stop.side && item.side !== "median") return false;
+    if (stop.cat && item.cat !== stop.cat) return false;
+    if (!stop.label) return Boolean(stop.cat);
+    const hay = item.label.toLowerCase();
+    const want = stop.label.toLowerCase();
+    if (hay === want) return true;
+    const at = hay.indexOf(want);
+    if (at < 0) return false;
+    const before = at === 0 || !/[a-z0-9]/.test(hay[at - 1] ?? "");
+    const after = at + want.length >= hay.length || !/[a-z0-9]/.test(hay[at + want.length] ?? "");
+    return before && after;
+  });
+  if (!hits.length) return null;
+  const want = stop.label?.toLowerCase();
+  const rec =
+    hits.slice().sort((a, b) => rankLabel(a.label, want) - rankLabel(b.label, want))[0] ?? hits[0]!;
+  const axis = stopAxis(stop, superior, anterior, right);
+  if (hits.length === 1 || stop.label) {
+    const focus = stop.tip ? extremePoint(rec, axis, 1) : stop.at == null ? rec.restCenter.clone() : pointAlong(rec, superior, stop.at, stop.bias === "anterior" ? anterior : undefined);
+    const spanFrom = stop.span ? extremePoint(rec, axis, -1) : undefined;
+    return { rec, focus, spanFrom };
+  }
+  const focus = new THREE.Vector3();
+  for (const item of hits) focus.add(item.restCenter);
+  focus.multiplyScalar(1 / hits.length);
+  let nearest = rec;
+  let best = Infinity;
+  for (const item of hits) {
+    const d = item.restCenter.distanceToSquared(focus);
+    if (d < best) {
+      best = d;
+      nearest = item;
+    }
+  }
+  return { rec: nearest, focus };
+}
+
+function rankLabel(label: string, want?: string) {
+  if (!want) return 0;
+  const hay = label.toLowerCase();
+  if (hay === want) return 0;
+  if (hay.startsWith(want)) return 1;
+  return 2;
+}
+
+function stopAxis(stop: ModuleStop, superior: THREE.Vector3, anterior: THREE.Vector3, right: THREE.Vector3) {
+  if (stop.tip === "inferior") return superior.clone().negate();
+  if (stop.tip === "lateral") return right.clone().multiplyScalar(stop.side === "right" ? 1 : -1);
+  return anterior.clone();
+}
+
+function extremePoint(rec: Rec, axis: THREE.Vector3, sign: 1 | -1) {
+  const pos = rec.mesh.geometry.getAttribute("position");
+  const v = new THREE.Vector3();
+  const best = new THREE.Vector3();
+  let score = -Infinity;
+  const step = Math.max(1, Math.floor(pos.count / 700));
+  for (let i = 0; i < pos.count; i += step) {
+    v.fromBufferAttribute(pos as THREE.BufferAttribute, i);
+    const s = v.dot(axis) * sign;
+    if (s > score) {
+      score = s;
+      best.copy(v);
+    }
+  }
+  return best;
+}
+
+function pointAlong(rec: Rec, superior: THREE.Vector3, t: number, bias?: THREE.Vector3) {
   const pos = rec.mesh.geometry.getAttribute("position");
   const v = new THREE.Vector3();
   const step = Math.max(1, Math.floor(pos.count / 500));
@@ -786,6 +859,22 @@ function pointAlong(rec: Rec, superior: THREE.Vector3, t: number) {
   }
   const target = THREE.MathUtils.lerp(minS, maxS, t);
   const best = new THREE.Vector3();
+  if (bias) {
+    const band = Math.max((maxS - minS) * 0.08, 1e-5);
+    let bestA = -Infinity;
+    let found = false;
+    for (let i = 0; i < pos.count; i += step) {
+      v.fromBufferAttribute(pos as THREE.BufferAttribute, i);
+      if (Math.abs(v.dot(superior) - target) > band) continue;
+      const a = v.dot(bias);
+      if (a > bestA) {
+        bestA = a;
+        best.copy(v);
+        found = true;
+      }
+    }
+    if (found) return best;
+  }
   let bestD = Infinity;
   for (let i = 0; i < pos.count; i += step) {
     v.fromBufferAttribute(pos as THREE.BufferAttribute, i);
@@ -900,6 +989,67 @@ function visualTarget(rec: Rec, frame: Frame, explode: number, retract: number, 
 function smoothstep01(e0: number, e1: number, x: number) {
   const t = THREE.MathUtils.clamp((x - e0) / (e1 - e0), 0, 1);
   return t * t * (3 - 2 * t);
+}
+
+const ROD_GEO = new THREE.CylinderGeometry(1, 1, 1, 6, 1, false);
+const ROD_UP = new THREE.Vector3(0, 1, 0);
+const _rodDir = new THREE.Vector3();
+const _rodA = new THREE.Vector3();
+const _rodB = new THREE.Vector3();
+const _rodMid = new THREE.Vector3();
+const _rodSide = new THREE.Vector3();
+const _rodP = new THREE.Vector3();
+const _rodQ = new THREE.Vector3();
+const _rodRef = new THREE.Vector3();
+
+function fiberBow(a: THREE.Vector3, b: THREE.Vector3) {
+  const dir = b.clone().sub(a);
+  const len = Math.max(dir.length(), 1e-5);
+  dir.multiplyScalar(1 / len);
+  _rodRef.set(Math.abs(dir.y) > 0.85 ? 1 : 0, Math.abs(dir.y) > 0.85 ? 0 : 1, 0);
+  const side = new THREE.Vector3().crossVectors(dir, _rodRef).normalize();
+  const lift = new THREE.Vector3().crossVectors(side, dir).normalize();
+  return side.multiplyScalar(len * 0.035).addScaledVector(lift, len * 0.055);
+}
+
+function makeRod() {
+  const mesh = new THREE.Mesh(
+    ROD_GEO,
+    new THREE.MeshStandardMaterial({
+      color: "#e4d5c0",
+      emissive: "#7a4e32",
+      emissiveIntensity: 0.12,
+      roughness: 0.58,
+      metalness: 0,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+    }),
+  );
+  mesh.raycast = () => {};
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 5;
+  mesh.visible = false;
+  return mesh;
+}
+
+function placeRod(mesh: THREE.Mesh, a: THREE.Vector3, b: THREE.Vector3, radius: number, hot: boolean, dead = false) {
+  _rodDir.subVectors(b, a);
+  const len = _rodDir.length();
+  if (len < 1e-5) {
+    mesh.visible = false;
+    return;
+  }
+  _rodDir.multiplyScalar(1 / len);
+  mesh.visible = true;
+  mesh.position.copy(a).lerp(b, 0.5);
+  mesh.quaternion.setFromUnitVectors(ROD_UP, _rodDir);
+  mesh.scale.set(dead ? radius * 0.55 : radius, len, dead ? radius * 0.55 : radius);
+  const mat = mesh.material as THREE.MeshStandardMaterial;
+  mat.color.set(dead ? "#8a8178" : hot ? "#f0e2d0" : "#e4d5c0");
+  mat.emissive.set(dead ? "#000000" : "#7a4e32");
+  mat.emissiveIntensity = dead ? 0 : hot ? 0.22 : 0.08;
+  mat.opacity = dead ? 0.12 : hot ? 0.82 : 0.46;
 }
 
 function tubeBetween(a: THREE.Vector3, b: THREE.Vector3, r0: number, r1: number, radial = 8) {
@@ -1418,6 +1568,16 @@ function Specimen() {
   const fly = useRef<{ cam: THREE.Vector3; target: THREE.Vector3 } | null>(null);
   const nonce = useRef(-1);
   const tourRef = useRef("");
+  const scenarioRef = useRef<string | null>(null);
+  const scenarioKeys = useRef<Set<string> | null>(null);
+  const circuitRef = useRef<THREE.Group | null>(null);
+  const circuitId = useRef<string | null>(null);
+  if (!circuitRef.current) {
+    const group = new THREE.Group();
+    group.name = "circuit";
+    group.visible = false;
+    circuitRef.current = group;
+  }
   const opticsTick = useRef(0);
   const modeRef = useRef<"specimen" | "parcellation">("specimen");
   const keyRef = useRef<THREE.DirectionalLight>(null);
@@ -1816,6 +1976,7 @@ function Specimen() {
             }
 
             rig.current?.add(gltf.scene, room);
+            if (circuitRef.current) gltf.scene.add(circuitRef.current);
 
             const keyPos = center
               .clone()
@@ -2001,18 +2162,14 @@ function Specimen() {
     if (tourKey !== tourRef.current) {
       tourRef.current = tourKey;
       if (state.tour) {
-        const stop = TOURS[state.tour.id].stops[state.tour.index];
-        const want = stop?.label.toLowerCase();
-        const rec = want
-          ? frame.records.find((item) => item.label.toLowerCase() === want && (!stop.side || item.side === stop.side)) ??
-            frame.records.find((item) => item.label.toLowerCase().includes(want) && (!stop.side || item.side === stop.side || item.side === "median"))
-          : undefined;
-        if (rec && stop) {
-          useLab.getState().patch({ selected: rec.key });
-          const focus = stop.at == null ? rec.restCenter.clone() : pointAlong(rec, frame.superior, stop.at);
-          visualTarget(rec, frame, state.explode, state.retract, state.excised, _desired);
-          focus.add(_desired).sub(rec.restCenter);
-          const dist = THREE.MathUtils.clamp(stop.at == null ? Math.max(rec.radius * 4.2, frame.maxDim * 0.34) : frame.maxDim * 0.3, frame.maxDim * 0.18, frame.maxDim * 0.62);
+        const stop = SCENARIO_BY_ID[state.tour.id].stops[state.tour.index];
+        const found = stop ? findStop(frame.records, stop, frame.superior, frame.anterior, frame.right) : null;
+        if (found && stop) {
+          useLab.getState().patch({ selected: found.rec.key });
+          const focus = found.focus;
+          visualTarget(found.rec, frame, state.explode, state.retract, state.excised, _desired);
+          focus.add(_desired).sub(found.rec.restCenter);
+          const dist = THREE.MathUtils.clamp(stop.at == null && !stop.cat ? Math.max(found.rec.radius * 4.2, frame.maxDim * 0.34) : frame.maxDim * 0.32, frame.maxDim * 0.18, frame.maxDim * 0.62);
           const lateral = stop.side === "left" ? -0.42 : stop.side === "right" ? 0.42 : 0.28;
           _view.copy(frame.anterior).multiplyScalar(0.8).addScaledVector(frame.right, lateral).addScaledVector(frame.superior, 0.22).normalize();
           fly.current = { cam: focus.clone().addScaledVector(_view, dist), target: focus };
@@ -2042,6 +2199,18 @@ function Specimen() {
     const viewDist = controls ? camera.position.distanceTo(controls.target) : frame.maxDim * 2;
     const close =
       state.quality === "high" ? THREE.MathUtils.smoothstep(frame.maxDim * 1.15, frame.maxDim * 0.38, viewDist) : 0;
+    if (scenarioRef.current !== state.scenario) {
+      scenarioRef.current = state.scenario;
+      if (!state.scenario) scenarioKeys.current = null;
+      else {
+        const spec = SCENARIO_BY_ID[state.scenario];
+        const keys = new Set<string>();
+        for (const rec of frame.records) if (scenarioHit(rec.label, rec.cat, spec)) keys.add(rec.key);
+        scenarioKeys.current = keys;
+      }
+    }
+    const scenarioOn = scenarioKeys.current;
+    const breathe = scenarioOn ? 0.5 + 0.5 * Math.sin(performance.now() * 0.0016) : 0;
 
     for (const rec of frame.records) {
       let op = state.visible[rec.cat] ? state.opacity[rec.cat] : 0;
@@ -2123,13 +2292,13 @@ function Specimen() {
         const coat0 = (rec.mat.userData.coat0 as number) ?? 0.16;
         rec.mat.roughness = dull ? 0.78 : rough0;
         rec.mat.metalness = 0.02;
-        rec.mat.envMapIntensity = dull ? 0.04 : rec.cat === "cortex" || rec.cat === "cerebellum" ? 0.06 : rec.cat === "spinal_cord" ? 0.14 : rec.cat === "deep_grey" || rec.cat === "brainstem" ? 0.08 : 0.1;
+        rec.mat.envMapIntensity = dull ? 0.04 : rec.cat === "cortex" || rec.cat === "cerebellum" ? 0.07 : rec.cat === "spinal_cord" ? 0.14 : rec.cat === "deep_grey" || rec.cat === "brainstem" ? 0.08 : 0.1;
         if (phys.isMeshPhysicalMaterial) {
           const film = !dull && state.quality === "high" && rec.cat === "cortex" && phys.iridescence > 0 ? close : 0;
-          phys.clearcoat = dull ? 0.01 : Math.min(coat0, rec.cat === "cortex" || rec.cat === "cerebellum" ? 0.045 : 0.08) + film * 0.04;
-          phys.clearcoatRoughness = dull ? 0.84 : Math.max(0.48, (rec.cat === "cortex" || rec.cat === "cerebellum" ? 0.72 : 0.58) - film * 0.08);
-          phys.sheen = dull ? 0.01 : rec.cat === "spinal_cord" ? 0.1 : rec.cat === "cortex" || rec.cat === "cerebellum" ? 0.04 : 0.07;
-          if (film > 0) phys.iridescence = 0.008 + film * 0.06;
+          phys.clearcoat = dull ? 0.01 : Math.min(coat0, rec.cat === "cortex" || rec.cat === "cerebellum" ? 0.07 : 0.09) + film * 0.03;
+          phys.clearcoatRoughness = dull ? 0.84 : Math.max(0.46, (rec.cat === "cortex" || rec.cat === "cerebellum" ? 0.58 : 0.5) - film * 0.06);
+          phys.sheen = dull ? 0.01 : rec.cat === "spinal_cord" ? 0.12 : rec.cat === "cortex" || rec.cat === "cerebellum" ? 0.09 : 0.08;
+          if (film > 0) phys.iridescence = 0.008 + film * 0.04;
         }
       }
       if (rec.cat === "white_matter" || rec.cat === "tracts") {
@@ -2138,9 +2307,36 @@ function Specimen() {
         rec.mat.metalness = 0;
         rec.mat.roughness = 0.82;
       }
-      if (state.selected === rec.key && rec.cat !== "arteries" && rec.cat !== "veins_sinuses") {
+      const lit = scenarioOn?.has(rec.key) ?? false;
+      const cutAt = state.tour && state.scenario === state.tour.id ? state.tour.index : -1;
+      const dead =
+        state.scenario != null &&
+        cutAt >= 0 &&
+        lostToCut(SCENARIO_BY_ID[state.scenario], cutAt, rec.label, rec.cat, rec.side);
+      if (scenarioOn && dead) {
+        const phys = rec.mat as THREE.MeshPhysicalMaterial;
+        rec.mat.color.lerp(CUT_DEAD, 0.48);
+        rec.mat.color.multiplyScalar(0.86);
+        rec.mat.roughness = Math.max(rec.mat.roughness, 0.74);
+        if (phys.isMeshPhysicalMaterial) {
+          phys.clearcoat = 0;
+          phys.sheen = 0.01;
+          phys.clearcoatRoughness = 0.92;
+        }
+      } else if (scenarioOn && !lit) {
+        rec.mat.color.lerp(SCENARIO_ASH, 0.62);
+        rec.mat.color.multiplyScalar(0.78);
+      }
+      if (scenarioOn && lit && !dead) {
+        rec.mat.color.lerp(SCENARIO_GOLD, state.selected === rec.key ? 0.22 : 0.1);
+        rec.mat.emissive.set("#6b3a28");
+        rec.mat.emissiveIntensity = (state.selected === rec.key ? 0.1 : 0.045) + breathe * 0.03;
+      } else if (state.selected === rec.key && rec.cat !== "arteries" && rec.cat !== "veins_sinuses") {
         rec.mat.emissive.set("#123f36");
         rec.mat.emissiveIntensity = 0.42;
+      } else if (dead) {
+        rec.mat.emissive.set("#000000");
+        rec.mat.emissiveIntensity = 0;
       } else if (rec.cat === "arteries" || rec.cat === "veins_sinuses") {
         rec.mat.emissive.copy(rec.specimen).multiplyScalar(0.18);
         rec.mat.emissiveIntensity = (rec.cat === "arteries" ? 0.1 : 0.08) + pulse * (rec.cat === "arteries" ? 0.62 : 0.42);
@@ -2157,6 +2353,75 @@ function Specimen() {
       } else if (rec.mat.emissiveIntensity !== 0) {
         rec.mat.emissive.set("#000000");
         rec.mat.emissiveIntensity = 0;
+      }
+    }
+
+    const circuit = circuitRef.current;
+    if (circuit) {
+      if (!state.scenario) {
+        circuit.visible = false;
+        circuitId.current = null;
+      } else {
+        circuit.visible = true;
+        if (circuitId.current !== state.scenario) {
+          circuitId.current = state.scenario;
+          const spec = SCENARIO_BY_ID[state.scenario];
+          const located = spec.stops.map((stop) => findStop(frame.records, stop, frame.superior, frame.anterior, frame.right));
+          const built: { aKey: string; a: THREE.Vector3; bKey: string; b: THREE.Vector3; to: number; bow: THREE.Vector3 }[] = [];
+          for (const [from, to] of circuitLinks(spec.stops)) {
+            const start = located[from];
+            const end = located[to];
+            if (!start || !end) continue;
+            built.push({ aKey: start.rec.key, a: start.focus.clone(), bKey: end.rec.key, b: end.focus.clone(), to, bow: fiberBow(start.focus, end.focus) });
+          }
+          spec.stops.forEach((stop, index) => {
+            const hit = located[index];
+            if (!stop.span || !hit?.spanFrom) return;
+            built.push({
+              aKey: hit.rec.key,
+              a: hit.spanFrom.clone(),
+              bKey: hit.rec.key,
+              b: hit.focus.clone(),
+              to: index,
+              bow: fiberBow(hit.spanFrom, hit.focus),
+            });
+          });
+          circuit.userData.segs = built;
+        }
+        const segs = (circuit.userData.segs ?? []) as { aKey: string; a: THREE.Vector3; bKey: string; b: THREE.Vector3; to: number; bow: THREE.Vector3 }[];
+        const byKey = new Map(frame.records.map((rec) => [rec.key, rec]));
+        while (circuit.children.length < segs.length * 6) circuit.add(makeRod());
+        const radius = frame.maxDim * 0.00135;
+        const here = state.tour?.index ?? -1;
+        const lostStops = state.scenario && here >= 0 ? SCENARIO_BY_ID[state.scenario].stops[here]?.loss?.stops : undefined;
+        let cursor = 0;
+        const emit = (a: THREE.Vector3, b: THREE.Vector3, hot: boolean, deadRod: boolean) => {
+          const mesh = circuit.children[cursor++] as THREE.Mesh;
+          placeRod(mesh, a, b, hot ? radius * 1.25 : radius, hot, deadRod);
+        };
+        for (const seg of segs) {
+          const aRec = byKey.get(seg.aKey);
+          const bRec = byKey.get(seg.bKey);
+          if (!aRec || !bRec) continue;
+          _rodA.copy(seg.a).add(aRec.mesh.position);
+          _rodB.copy(seg.b).add(bRec.mesh.position);
+          _rodMid.copy(_rodA).lerp(_rodB, 0.5).add(seg.bow);
+          _rodDir.subVectors(_rodB, _rodA);
+          _rodRef.set(Math.abs(_rodDir.y) > Math.abs(_rodDir.z) ? 1 : 0, 0, Math.abs(_rodDir.y) > Math.abs(_rodDir.z) ? 0 : 1);
+          _rodSide.crossVectors(_rodDir, _rodRef).normalize();
+          const deadRod = lostStops?.includes(seg.to) ?? false;
+          const hot = seg.to === here;
+          for (const lane of [-1, 0, 1]) {
+            const spread = lane * radius * 2.6;
+            _rodP.copy(_rodA).addScaledVector(_rodSide, spread);
+            _rodQ.copy(_rodMid).addScaledVector(_rodSide, spread);
+            emit(_rodP, _rodQ, hot, deadRod);
+            _rodP.copy(_rodMid).addScaledVector(_rodSide, spread);
+            _rodQ.copy(_rodB).addScaledVector(_rodSide, spread);
+            emit(_rodP, _rodQ, hot, deadRod);
+          }
+        }
+        for (let i = cursor; i < circuit.children.length; i++) circuit.children[i]!.visible = false;
       }
     }
 

@@ -392,95 +392,26 @@ const PEARLS: Record<string, string> = {
     "The trochlear nerve supplies only the superior oblique. It is the only cranial nerve that crosses completely and leaves the brainstem dorsally.",
   "abducens filaments":
     "The abducens nerve supplies the lateral rectus, which abducts the eye.",
-};
-
-export type TourId = "visual" | "corticospinal";
-
-export type TourStop = {
-  title: string;
-  note: string;
-  label: string;
-  side?: "left" | "right" | "median";
-  at?: number;
-};
-
-export const TOURS: Record<TourId, { title: string; stops: TourStop[] }> = {
-  visual: {
-    title: "Visual pathway",
-    stops: [
-      {
-        title: "Globe",
-        label: "Globe",
-        side: "left",
-        note: "The left globe. The optic disc, just nasal of the posterior pole, is where the optic nerve begins.",
-      },
-      {
-        title: "Optic nerve",
-        label: "Optic nerve (II), intraorbital",
-        side: "left",
-        note: "CN II crosses the orbit from the disc to the optic canal. It is a tract of the central nervous system, wrapped in meninges.",
-      },
-      {
-        title: "Chiasm",
-        label: "Chiasmatic decussation",
-        note: "Nasal fibers cross. Temporal fibers stay lateral. Cutting the chiasm takes the outer half of both visual fields.",
-      },
-      {
-        title: "Optic tract",
-        label: "Optic tract",
-        side: "left",
-        note: "The left tract carries the right half of the visual field, from both eyes.",
-      },
-      {
-        title: "Optic radiation",
-        label: "Optic radiation",
-        side: "left",
-        note: "From the lateral geniculate, the radiation sweeps through the temporal and parietal lobes to the occipital cortex. This path is a population average.",
-      },
-      {
-        title: "Calcarine cortex",
-        label: "Cuneus",
-        side: "left",
-        note: "The upper bank, the cuneus, maps the lower visual field. The lower bank is the lingual gyrus.",
-      },
-    ],
-  },
-  corticospinal: {
-    title: "Corticospinal tract",
-    stops: [
-      {
-        title: "Precentral gyrus",
-        label: "Precentral gyrus",
-        side: "left",
-        note: "Primary motor cortex. The axons of layer V leave here as the corticospinal tract.",
-      },
-      {
-        title: "Internal capsule",
-        label: "Corticospinal tract",
-        side: "left",
-        at: 0.72,
-        note: "The fibers gather through the corona radiata and the posterior limb of the internal capsule.",
-      },
-      {
-        title: "Cerebral peduncle",
-        label: "Base of peduncle",
-        side: "left",
-        note: "In the midbrain the tract occupies the middle third of the cerebral peduncle.",
-      },
-      {
-        title: "Pyramid",
-        label: "Pyramid of medulla oblongata",
-        side: "left",
-        note: "The pyramid on the ventral medulla. Most of the fibers cross at its lower end.",
-      },
-      {
-        title: "Spinal cord",
-        label: "Spinal cord",
-        at: 0.9,
-        note: "Crossed fibers run in the lateral cord and end on motor neurons of the opposite anterior horn.",
-      },
-    ],
-  },
+  "olfactory nerve":
+    "Cranial nerve I. It leaves the skull through the cribriform plate. The nose is not part of this specimen.",
+  "oculomotor nerve":
+    "Cranial nerve III leaves the midbrain and enters the orbit. It ends on the extra-ocular muscles. The lids are not shown.",
+  "trochlear nerve":
+    "Cranial nerve IV. It reaches only the superior oblique. This specimen stops at that muscle.",
+  "abducens nerve":
+    "Cranial nerve VI. It reaches only the lateral rectus. This specimen stops at that muscle.",
+  "trigeminal nerve":
+    "Cranial nerve V. The three divisions leave the skull. The face beyond those branches is not shown.",
+  "facial nerve":
+    "Cranial nerve VII leaves through the temporal bone. The muscles of the face are not shown.",
+  "vestibular nerve":
+    "Part of cranial nerve VIII. It ends at the internal acoustic meatus in this specimen. The ear is not shown.",
+  "vagus nerve":
+    "Cranial nerve X leaves through the jugular foramen. The neck and the organs are not shown.",
+  "accessory nerve":
+    "Cranial nerve XI leaves through the jugular foramen. The sternocleidomastoid and trapezius are not shown.",
+  "hypoglossal nerve":
+    "Cranial nerve XII leaves through the hypoglossal canal. The tongue is not shown.",
 };
 
 const PEARL_LIST = Object.entries(PEARLS).sort((a, b) => b[0].length - a[0].length);
