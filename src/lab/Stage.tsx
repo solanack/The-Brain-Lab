@@ -74,9 +74,10 @@ const _desired = new THREE.Vector3();
 const _twist = new THREE.Quaternion();
 const _twistAxis = new THREE.Vector3(0, 1, 0);
 let layersOpened = false;
-let lungClock = 0;
 const _hingeAxis = new THREE.Vector3(1, 0, 0);
 const _pos = new THREE.Vector3();
+const _down = new THREE.Vector3();
+const _pin = new THREE.Vector3();
 const _view = new THREE.Vector3();
 const SCENARIO_GOLD = new THREE.Color("#a86848");
 const SCENARIO_ASH = new THREE.Color("#6a6560");
@@ -272,13 +273,15 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
       mat.roughness = 0.48;
     }
     if (cat === "lungs") {
-      phys.roughness = 0.4;
-      phys.clearcoat = 0.16;
-      phys.clearcoatRoughness = 0.34;
-      phys.sheen = 0.26;
-      phys.sheenColor.set("#d7b0a8");
-      phys.sheenRoughness = 0.42;
-      mat.roughness = 0.4;
+      phys.roughness = 0.72;
+      phys.clearcoat = 0.02;
+      phys.clearcoatRoughness = 0.84;
+      phys.sheen = 0.08;
+      phys.sheenColor.set("#c4a098");
+      phys.sheenRoughness = 0.7;
+      phys.envMapIntensity = 0.02;
+      mat.roughness = 0.72;
+      mat.envMapIntensity = 0.02;
       mat.side = THREE.DoubleSide;
       mat.color.set("#c48e88");
     }
@@ -1673,9 +1676,10 @@ function addSectionCaps(records: Rec[], scene: THREE.Scene, radius: number) {
     rec.mesh.renderOrder = 3;
   }
   const capMat = new THREE.MeshStandardMaterial({
-    color: "#e8a898",
-    roughness: 0.98,
+    color: "#c9a090",
+    roughness: 0.97,
     metalness: 0,
+    envMapIntensity: 0,
     side: THREE.DoubleSide,
     polygonOffset: true,
     polygonOffsetFactor: -1,
@@ -2410,7 +2414,12 @@ function Specimen() {
       for (const cat of CATEGORIES) visible[cat.id] = true;
       useLab.getState().patch({ visible });
     }
-    lungClock += d;
+    const breathPeriod = 60 / Math.max(4, state.rr);
+    const breathPhase = ((performance.now() / 1000) % breathPeriod) / breathPeriod;
+    const insp =
+      breathPhase < 0.4
+        ? THREE.MathUtils.smoothstep(0, 1, breathPhase / 0.4)
+        : 1 - THREE.MathUtils.smoothstep(0, 1, (breathPhase - 0.4) / 0.6);
     if (state.intentNonce !== nonce.current) {
       nonce.current = state.intentNonce;
       const intent = state.intent;
@@ -2535,6 +2544,19 @@ function Specimen() {
       if (rec.mat.clippingPlanes !== planes) rec.mat.clippingPlanes = planes;
       visualTarget(rec, frame, state.explode, state.retract, state.excised, _desired);
       _pos.copy(rec.restPosition).add(_desired).sub(rec.restCenter);
+      if (rec.cat === "lungs" || rec.cat === "pleura") {
+        const a = insp * (rec.cat === "pleura" ? 0.9 : 1);
+        const sx = 1 + a * 0.08;
+        const sy = 1 + a * 0.045;
+        const sz = 1 + a * 0.06;
+        _pin.set(0, (70 / frame.unitToMm) * (1 - sy), 0).applyQuaternion(rec.mesh.quaternion);
+        _pos.add(_pin);
+        rec.mesh.scale.set(sx, sy, sz);
+      } else if (rec.cat === "diaphragm") {
+        _down.set(0, -1, 0).applyQuaternion(rec.mesh.quaternion);
+        _pos.addScaledVector(_down, (11 / frame.unitToMm) * insp);
+        rec.mesh.scale.set(1 + insp * 0.035, 1, 1 + insp * 0.025);
+      }
       if (!rec.placed) {
         rec.mesh.position.copy(_pos);
         rec.placed = true;
@@ -2560,12 +2582,6 @@ function Specimen() {
         _twist.setFromAxisAngle(_hingeAxis, (rec.mesh.userData.openAngle as number) * amt);
         rec.mesh.quaternion.copy(baseQ).multiply(_twist);
         rec.mesh.scale.set(1, 1, 1);
-      } else if (rec.cat === "lungs") {
-        const breathe = 0.5 + 0.5 * Math.sin(lungClock * 0.55 + (rec.side === "left" ? 0.4 : 0));
-        rec.mesh.scale.setScalar(1 + breathe * 0.02);
-      } else if (rec.cat === "diaphragm") {
-        const breathe = 0.5 + 0.5 * Math.sin(lungClock * 0.55);
-        rec.mesh.scale.set(1, 1 - breathe * 0.07, 1);
       }
       const caps = rec.mesh.userData.caps as THREE.Mesh[] | undefined;
       if (caps) {
@@ -2611,11 +2627,13 @@ function Specimen() {
         const phys = rec.mat as THREE.MeshPhysicalMaterial;
         const dull = rec.cat === "cortex" && !state.piaOn;
         if (rec.cat === "cortex" && state.mode !== "parcellation") rec.mat.color.set("#d4a394");
-        rec.mat.roughness = dull ? 0.86 : 0.72;
+        if (rec.cat === "cerebellum" && state.mode !== "parcellation") rec.mat.color.set("#d2a898");
+        rec.mat.roughness = dull ? 0.86 : 0.74;
         rec.mat.metalness = 0;
-        rec.mat.envMapIntensity = 0;
+        rec.mat.envMapIntensity = 0.02;
         if (phys.isMeshPhysicalMaterial) {
-          phys.clearcoat = 0;
+          phys.clearcoat = 0.015;
+          phys.clearcoatRoughness = 0.86;
           phys.sheen = 0;
           phys.iridescence = 0;
           phys.transmission = 0;
@@ -2635,9 +2653,23 @@ function Specimen() {
       }
       if (rec.cat === "white_matter" || rec.cat === "tracts") {
         rec.mat.color.set(state.mode === "parcellation" ? rec.parcel : rec.cat === "white_matter" ? "#e8a898" : "#e39d94");
-        rec.mat.envMapIntensity = 0;
+        rec.mat.envMapIntensity = 0.015;
         rec.mat.metalness = 0;
-        rec.mat.roughness = 0.92;
+        rec.mat.roughness = 0.94;
+        const phys = rec.mat as THREE.MeshPhysicalMaterial;
+        if (phys.isMeshPhysicalMaterial) {
+          phys.clearcoat = 0.01;
+          phys.clearcoatRoughness = 0.9;
+          phys.sheen = 0;
+        }
+      }
+      if (rec.cat === "lungs" || rec.cat === "diaphragm") {
+        rec.mat.envMapIntensity = 0.02;
+        const phys = rec.mat as THREE.MeshPhysicalMaterial;
+        if (phys.isMeshPhysicalMaterial) {
+          phys.clearcoat = Math.min(phys.clearcoat, 0.02);
+          phys.clearcoatRoughness = Math.max(phys.clearcoatRoughness, 0.8);
+        }
       }
       const lit = scenarioOn?.has(rec.key) ?? false;
       const cutAt = state.tour && state.scenario === state.tour.id ? state.tour.index : -1;
@@ -2692,6 +2724,9 @@ function Specimen() {
       } else if (/choroid/i.test(rec.label)) {
         rec.mat.emissive.set("#6a3034");
         rec.mat.emissiveIntensity = 0.12 + pulse * 0.4;
+      } else if (rec.cat === "lungs") {
+        rec.mat.emissive.set("#6a3030");
+        rec.mat.emissiveIntensity = 0.02 + insp * 0.08;
       } else if (rec.cat === "cortex" || rec.cat === "cerebellum") {
         rec.mat.emissive.set("#000000");
         rec.mat.emissiveIntensity = 0;
@@ -2777,10 +2812,10 @@ function Specimen() {
     }
 
     if (keyRef.current && fillRef.current && rimRef.current && transRef.current) {
-      keyRef.current.intensity = state.light.key;
-      fillRef.current.intensity = state.light.fill;
-      rimRef.current.intensity = state.light.rim;
-      transRef.current.intensity = state.light.trans;
+      keyRef.current.intensity = state.light.key * 0.62;
+      fillRef.current.intensity = state.light.fill * 0.65;
+      rimRef.current.intensity = state.light.rim * 0.5;
+      transRef.current.intensity = state.light.trans * 0.45;
       keyRef.current.color.copy(WARM).lerp(COOL, state.light.temp);
     }
 
@@ -2868,16 +2903,16 @@ function Specimen() {
       <directionalLight
         ref={keyRef}
         position={[0.2, 2.6, 0.4]}
-        intensity={0.26}
+        intensity={0.16}
         color="#e4eef8"
         castShadow
         shadow-mapSize={[512, 512]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.02}
       />
-      <directionalLight ref={fillRef} position={[-1.8, 0.35, 0.2]} intensity={0.26} color="#ffc08a" />
-      <directionalLight ref={rimRef} position={[0.15, 0.65, -2.1]} intensity={0.16} color="#c5d6ea" />
-      <pointLight ref={transRef} position={[0, -1.2, 0.15]} intensity={0.18} color="#ffb090" distance={0} />
+      <directionalLight ref={fillRef} position={[-1.8, 0.35, 0.2]} intensity={0.1} color="#ffc08a" />
+      <directionalLight ref={rimRef} position={[0.15, 0.65, -2.1]} intensity={0.04} color="#c5d6ea" />
+      <pointLight ref={transRef} position={[0, -1.2, 0.15]} intensity={0.02} color="#ffb090" distance={0} />
       <group ref={rig} />
       <OrbitControls makeDefault enableDamping dampingFactor={0.08} enablePan maxPolarAngle={Math.PI * 0.96} minPolarAngle={0.05} />
       {booted &&
@@ -2912,11 +2947,11 @@ export function Stage() {
           alpha: false,
           localClippingEnabled: true,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 0.7,
+          toneMappingExposure: 0.72,
           powerPreference: "high-performance",
         }}
         onCreated={({ gl, scene }) => {
-          gl.toneMappingExposure = 0.7;
+          gl.toneMappingExposure = 0.72;
           gl.outputColorSpace = THREE.SRGBColorSpace;
           gl.shadowMap.enabled = true;
           gl.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -2925,10 +2960,10 @@ export function Stage() {
           try {
             const pmrem = new THREE.PMREMGenerator(gl);
             scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.18).texture;
-            scene.environmentIntensity = 0.08;
+            scene.environmentIntensity = 0.035;
             pmrem.dispose();
           } catch {
-            scene.environmentIntensity = 0.16;
+            scene.environmentIntensity = 0.04;
           }
         }}
       >

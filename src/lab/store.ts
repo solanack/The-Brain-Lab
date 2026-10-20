@@ -62,6 +62,7 @@ export type LabState = {
   light: { key: number; fill: number; rim: number; trans: number; temp: number };
   quality: Quality;
   hr: number;
+  rr: number;
   turntable: boolean;
   intent: Intent;
   intentNonce: number;
@@ -122,6 +123,7 @@ export const useLab = create<LabState>((set, get) => ({
   light: { key: 0.26, fill: 0.16, rim: 0.08, trans: 0.04, temp: 0.7 },
   quality: "medium",
   hr: 68,
+  rr: 14,
   turntable: false,
   intent: null,
   intentNonce: 0,

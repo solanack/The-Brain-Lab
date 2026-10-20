@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { CATEGORIES, GROUPS, RECIPES, type CatId, type SampleId } from "./data";
-import { SCENARIOS, SCENARIO_BY_ID, scenarioHit, type ScenarioId } from "./scenarios";
+import { CONTROLLER_TOURS, SCENARIOS, SCENARIO_BY_ID, scenarioHit, type ScenarioId } from "./scenarios";
 import { useLab, type Axis } from "./store";
 
 function Meter({
@@ -87,10 +87,82 @@ export function Chrome() {
   const error = useLab((s) => s.error);
   const optics = useLab((s) => s.optics);
   const hr = useLab((s) => s.hr);
+  const rr = useLab((s) => s.rr);
   const brief = useLab((s) => s.brief);
   const sheet = useLab((s) => s.sheet);
   const tour = useLab((s) => s.tour);
   const patch = useLab((s) => s.patch);
+  const [caption, setCaption] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timers: number[] = [];
+    const clear = () => {
+      for (const id of timers) window.clearTimeout(id);
+      timers.length = 0;
+    };
+    const apply = (step: {
+      say: string;
+      scenario?: ScenarioId | null;
+      explode?: number;
+      sectionOn?: boolean;
+      axis?: Axis;
+      depth?: number;
+      home?: boolean;
+    }) => {
+      if (step.scenario) openModule(step.scenario);
+      else if (step.scenario === null) closeModule();
+      const next: { explode?: number; sectionOn?: boolean; axis?: Axis; depth?: number } = {};
+      if (step.explode != null) next.explode = step.explode;
+      if (step.sectionOn != null) next.sectionOn = step.sectionOn;
+      if (step.axis) next.axis = step.axis;
+      if (step.depth != null) next.depth = step.depth;
+      if (Object.keys(next).length) useLab.getState().patch(next);
+      if (step.home) useLab.getState().request({ type: "home" });
+      setCaption(step.say);
+    };
+    const api = {
+      scenarios: () => SCENARIOS.map((item) => ({ id: item.id, title: item.title, note: item.note })),
+      tours: () => Object.entries(CONTROLLER_TOURS).map(([id, item]) => ({ id, title: item.title, lines: item.steps.map((step) => step.say) })),
+      play: (id: ScenarioId) => {
+        clear();
+        openModule(id);
+        const note = SCENARIO_BY_ID[id].note;
+        setCaption(note);
+        return note;
+      },
+      next: () => {
+        const current = useLab.getState().tour;
+        if (!current) return null;
+        const spec = SCENARIO_BY_ID[current.id];
+        const index = Math.min(spec.stops.length - 1, current.index + 1);
+        useLab.getState().patch({ tour: { id: current.id, index } });
+        const note = spec.stops[index]?.note ?? spec.note;
+        setCaption(note);
+        return note;
+      },
+      run: (id: keyof typeof CONTROLLER_TOURS) => {
+        clear();
+        const item = CONTROLLER_TOURS[id];
+        if (!item) return null;
+        item.steps.forEach((step, index) => {
+          timers.push(window.setTimeout(() => apply(step), index * 8000));
+        });
+        timers.push(window.setTimeout(() => setCaption(null), item.steps.length * 8000 + 400));
+        return item.title;
+      },
+      reset: () => {
+        clear();
+        closeModule();
+        useLab.getState().reassemble();
+        setCaption(null);
+      },
+    };
+    (window as Window & { neurotome?: typeof api }).neurotome = api;
+    return () => {
+      clear();
+      delete (window as Window & { neurotome?: typeof api }).neurotome;
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -121,6 +193,7 @@ export function Chrome() {
             aria-hidden
           />
           <span className="font-mono text-xs text-muted tabular-nums">{hr} bpm</span>
+          <span className="font-mono text-xs text-muted tabular-nums">{rr}/min</span>
           <span className="hidden font-mono text-xs text-muted tabular-nums sm:inline">
             {optics.approach} · {optics.distanceMm.toFixed(0)} mm
           </span>
@@ -166,6 +239,12 @@ export function Chrome() {
           {sheet === "layers" && <Layers />}
           {sheet === "dossier" && <Dossier />}
           {sheet === "field" && <Field />}
+        </div>
+      )}
+
+      {caption && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-20 z-20 flex justify-center px-3">
+          <p className="max-w-xl rounded-2xl border border-border bg-bg/90 px-4 py-2 text-center text-sm">{caption}</p>
         </div>
       )}
 
@@ -690,6 +769,7 @@ function Dossier() {
 function Field() {
   const light = useLab((s) => s.light);
   const hr = useLab((s) => s.hr);
+  const rr = useLab((s) => s.rr);
   const retract = useLab((s) => s.retract);
   const turntable = useLab((s) => s.turntable);
   const quality = useLab((s) => s.quality);
@@ -717,6 +797,7 @@ function Field() {
       </div>
       <p className="px-1 text-[11px] leading-snug text-muted">Medium keeps the wet film and maps. High adds subsurface glow, fiber sheen, and close-up grain. Low is the plain specimen.</p>
       <Meter label="Heart rate" min={40} max={140} step={1} value={hr} format={(v) => `${Math.round(v)} bpm`} onChange={(v) => patch({ hr: v })} />
+      <Meter label="Breathing" min={8} max={28} step={1} value={rr} format={(v) => `${Math.round(v)} / min`} onChange={(v) => patch({ rr: v })} />
       <Meter label="Retract dura" min={0} max={1} step={0.01} value={retract} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => patch({ retract: v })} />
       <button type="button" className="h-11 text-left text-sm" onClick={() => patch({ turntable: !turntable })}>
         {turntable ? "Stop turntable" : "Start turntable"}

@@ -1,6 +1,6 @@
 import type { CatId } from "./data";
 
-export const SCENARIO_IDS = ["reach", "see", "hear", "fear", "exit"] as const;
+export const SCENARIO_IDS = ["reach", "see", "hear", "fear", "speech", "memory", "breathe", "autonomic", "exit"] as const;
 
 export type ScenarioId = (typeof SCENARIO_IDS)[number];
 
@@ -381,9 +381,199 @@ export const SCENARIOS: Scenario[] = [
       },
     ],
   },
+  {
+    id: "speech",
+    title: "Speech",
+    note: "Speaking a word. Broca's area plans it, the arcuate fasciculus carries it, and the superior temporal gyrus hears it back.",
+    labels: ["inferior frontal gyrus", "arcuate fasciculus", "superior temporal gyrus", "transverse temporal"],
+    cats: [],
+    show: ["cortex", "tracts", "white_matter"],
+    fade: { cortex: 0.28, tracts: 1, white_matter: 0.2, cerebellum: 0.08, brainstem: 0.12, dura: 0.04, arachnoid: 0.04 },
+    stops: [
+      {
+        title: "Broca's area",
+        label: "Inferior frontal gyrus",
+        side: "left",
+        note: "The inferior frontal gyrus on the dominant side plans the movements of speech.",
+      },
+      {
+        title: "Arcuate fasciculus",
+        label: "Arcuate fasciculus",
+        side: "left",
+        note: "A long association bundle from frontal to temporal language cortex.",
+      },
+      {
+        title: "Wernicke's region",
+        label: "Superior temporal gyrus",
+        side: "left",
+        note: "The posterior superior temporal gyrus interprets the word that was spoken.",
+      },
+    ],
+  },
+  {
+    id: "memory",
+    title: "Memory",
+    note: "Forming a memory. The hippocampus binds it. The fornix carries it to the mammillary bodies.",
+    labels: ["hippocampus", "fornix", "mamillary body", "mammillary"],
+    cats: [],
+    show: ["cortex", "white_matter", "diencephalon"],
+    fade: { cortex: 0.14, white_matter: 0.35, diencephalon: 0.8, cerebellum: 0.08, brainstem: 0.15, dura: 0.04, arachnoid: 0.04 },
+    stops: [
+      {
+        title: "Hippocampus",
+        label: "Hippocampus",
+        side: "left",
+        note: "Archicortex in the medial temporal lobe. It binds an episode. A cut here stops the output.",
+      },
+      {
+        title: "Fornix",
+        label: "Fornix",
+        note: "The output arch of the hippocampus, under the corpus callosum, toward the mammillary bodies.",
+      },
+      {
+        title: "Mammillary body",
+        label: "Mamillary body",
+        note: "The mammillary bodies receive the fornix. They are part of the Papez circuit.",
+      },
+    ],
+  },
+  {
+    id: "breathe",
+    title: "Breathing",
+    note: "Quiet breathing. The phrenic nerve drives the diaphragm. The diaphragm descends and the lungs fill. Expiration is slower, and passive.",
+    labels: ["phrenic", "diaphragm", "trachea", "bronch"],
+    cats: ["lungs", "diaphragm", "airway", "pleura"],
+    show: ["lungs", "pleura", "diaphragm", "airway", "peripheral", "heart"],
+    fade: {
+      lungs: 1,
+      pleura: 0.18,
+      diaphragm: 1,
+      airway: 1,
+      peripheral: 0.9,
+      heart: 0.28,
+      cortex: 0.05,
+      cerebellum: 0.05,
+      arteries: 0.12,
+      veins: 0.08,
+      dura: 0.04,
+      arachnoid: 0.04,
+    },
+    stops: [
+      {
+        title: "Phrenic nerve",
+        label: "Phrenic nerve",
+        note: "From C3 to C5. It is the motor nerve of the diaphragm.",
+      },
+      {
+        title: "Diaphragm",
+        label: "Diaphragm",
+        note: "It contracts and flattens. The lungs follow it down. The right dome sits higher than the left.",
+      },
+      {
+        title: "Lungs",
+        cat: "lungs",
+        note: "The right lung has three lobes. The left has two, with a cardiac notch. The airway stays open between them.",
+      },
+    ],
+  },
+  {
+    id: "autonomic",
+    title: "Autonomic",
+    note: "The medulla sets the rhythm. The vagus slows the heart. The sympathetic trunk speeds it and constricts vessels.",
+    labels: ["sympathetic", "vagus", "medulla oblongata", "splanchnic"],
+    cats: ["sympathetic"],
+    show: ["sympathetic", "brainstem", "cranial_nerves", "heart", "spinal_cord", "peripheral"],
+    fade: {
+      sympathetic: 1,
+      brainstem: 0.85,
+      cranial_nerves: 0.75,
+      heart: 0.6,
+      spinal_cord: 0.4,
+      peripheral: 0.35,
+      cortex: 0.06,
+      cerebellum: 0.08,
+      dura: 0.04,
+      arachnoid: 0.04,
+    },
+    stops: [
+      {
+        title: "Medulla",
+        label: "Medulla oblongata",
+        note: "Cardiac and respiratory circuitry sit in the medullary tegmentum.",
+      },
+      {
+        title: "Vagus nerve",
+        label: "Vagus nerve",
+        side: "left",
+        note: "Cranial nerve X is the parasympathetic outflow to the heart and the organs of the chest and abdomen.",
+      },
+      {
+        title: "Sympathetic trunk",
+        label: "Sympathetic trunk",
+        note: "The paravertebral chain. Splanchnic nerves leave it for the abdominal ganglia.",
+      },
+    ],
+  },
 ];
 
 export const SCENARIO_BY_ID = Object.fromEntries(SCENARIOS.map((item) => [item.id, item])) as Record<ScenarioId, Scenario>;
+
+export const CONTROLLER_TOURS = {
+  overview: {
+    title: "Anatomy overview",
+    steps: [
+      {
+        say: "This is the intact brain, life size. The folded surface is cortex. Orbit it, or hide a layer to dissect.",
+        scenario: null,
+        explode: 0,
+        sectionOn: false,
+        home: true,
+      },
+      {
+        say: "A coronal section shows the pink cortex as a ribbon and the cream white matter underneath.",
+        scenario: null,
+        explode: 0,
+        sectionOn: true,
+        axis: "coronal" as const,
+        depth: 0.46,
+      },
+      {
+        say: "Explode separates the hemispheres from the deeper grey, the ventricles, and the brainstem. Close the section to see the whole specimen again.",
+        scenario: null,
+        sectionOn: false,
+        explode: 0.55,
+      },
+    ],
+  },
+  vision: {
+    title: "Visual pathway",
+    steps: [
+      {
+        say: "Seeing starts at the globe. The optic nerve, chiasm, tract, and radiation carry the image to the calcarine cortex.",
+        scenario: "see" as const,
+        explode: 0.2,
+        sectionOn: false,
+      },
+    ],
+  },
+  breathing: {
+    title: "Breathing",
+    steps: [
+      {
+        say: "Quiet breathing. The phrenic nerve drives the diaphragm, the diaphragm descends, and the lungs fill. The rate is separate from the heartbeat.",
+        scenario: "breathe" as const,
+        explode: 0.28,
+        sectionOn: false,
+      },
+      {
+        say: "The same chest also answers the autonomic system. The medulla, the vagus, and the sympathetic trunk set the heart and the vessels.",
+        scenario: "autonomic" as const,
+        explode: 0.35,
+        sectionOn: false,
+      },
+    ],
+  },
+} as const;
 
 export function circuitLinks(stops: ModuleStop[]) {
   const links: [number, number][] = [];

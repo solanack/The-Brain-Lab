@@ -502,7 +502,13 @@ const PEARLS: Record<string, string> = {
   pericardium:
     "A fibrous sac around the heart. Explode lifts it off the surface.",
   lung:
-    "Spongy organs on either side of the heart. Pulmonary arteries enter the hilum. Pulmonary veins leave it.",
+    "Spongy organs on either side of the heart. The right lung has three lobes. The left has two and a cardiac notch. Pulmonary arteries enter the hilum. Pulmonary veins leave it.",
+  "upper lobe":
+    "The right upper lobe sits above the horizontal fissure. The left upper lobe includes the lingula.",
+  "middle lobe":
+    "The right middle lobe is the anterior wedge between the horizontal and oblique fissures. The left lung has no middle lobe.",
+  "lower lobe":
+    "The lower lobe sits below the oblique fissure, on the diaphragm. It is the part that moves most with a quiet breath.",
   pleura:
     "A closed sac around the lung. The outer layer lines the chest. The inner layer coats the lobes. Explode lifts the sac off.",
   diaphragm:
@@ -550,6 +556,10 @@ const PEARLS: Record<string, string> = {
     "Each spinal nerve is mixed. The dorsal root ganglion sits just distal to the junction of dorsal and ventral roots. There are 8 cervical, 12 thoracic, 5 lumbar, 5 sacral, and 1 coccygeal pair.",
   phrenic:
     "The phrenic nerve is the main motor supply of the diaphragm. It is formed from C3–C5 and descends through the neck and the mediastinum.",
+  sympathetic:
+    "The sympathetic trunk is a paravertebral chain. White and gray rami join it to the spinal nerves. Greater, lesser, and least splanchnic nerves leave it for the abdominal ganglia.",
+  "inferior frontal":
+    "The inferior frontal gyrus. On the dominant side its posterior part is Broca's area, which plans the movements of speech.",
   "brachial plexus":
     "Ventral rami of C5–T1. Roots, trunks, divisions, and cords sit between the neck and the axilla, then form the nerves of the upper limb.",
   "median nerve":
@@ -578,8 +588,6 @@ const PEARLS: Record<string, string> = {
     "The common fibular division winds around the neck of the fibula. A common site of compression.",
   pudendal:
     "From S2–S4. It leaves the pelvis and supplies the perineum and the external anal and urethral sphincters.",
-  sympathetic:
-    "The sympathetic trunk is a chain of ganglia on either side of the vertebral column. White and gray rami connect it to the spinal nerves.",
   vagus:
     "Cranial nerve X continues past the skull through the neck and the thorax. It is the main parasympathetic supply to the organs of the chest and abdomen.",
   "cervical plexus":
