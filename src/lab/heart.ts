@@ -590,21 +590,107 @@ export function buildCirculation(
       const k = (u - 0.7) / 0.3;
       y += k * (78 * medial + 16 * Math.max(0, anteriorDir));
     }
-    const grain = Math.sin(ang * 8 + u * 6) * Math.sin(u * 13);
+    const anterior = Math.max(0, anteriorDir);
+    const posterior = Math.max(0, -anteriorDir);
+    const costal = Math.max(0, around);
+    z -= anterior * anterior * ap * 0.38 * inflate;
+    z -= posterior * 8 * grow;
+    const rib = Math.sin((y / 18) * Math.PI * 2);
+    x -= side * costal * rib * 1.2 * (0.35 + 0.65 * grow);
+    const grain = Math.sin(ang * 5 + u * 4) * Math.sin(u * 9);
     x += 0.45 * grain;
     z += 0.35 * grain;
     return new THREE.Vector3(s(x), s(y), s(z));
   };
-  const band = (sideSign: 1 | -1, u0: number, u1: number, v0 = 0, v1 = 1) =>
-    surface(14, 24, (u, v) => lungPoint(sideSign, THREE.MathUtils.lerp(u0, u1, u), THREE.MathUtils.lerp(v0, v1, v)));
+  const solidLobe = (sideSign: 1 | -1, u0: number, u1: number, v0 = 0, v1 = 1) => {
+    const su = 14;
+    const wrap = v1 - v0 > 0.98;
+    const sv = wrap ? 24 : 12;
+    const cols = wrap ? sv : sv + 1;
+    const pos: number[] = [];
+    const uv: number[] = [];
+    const ix: number[] = [];
+    const at = (i: number, j: number) => i * cols + (wrap ? ((j % sv) + sv) % sv : j);
+    for (let i = 0; i <= su; i++) {
+      const u = THREE.MathUtils.lerp(u0, u1, i / su);
+      for (let j = 0; j < cols; j++) {
+        const v = wrap ? j / sv : THREE.MathUtils.lerp(v0, v1, j / sv);
+        const p = lungPoint(sideSign, u, v, 1);
+        pos.push(p.x, p.y, p.z);
+        uv.push(v * 5, u * 4);
+      }
+    }
+    for (let i = 0; i < su; i++) {
+      for (let j = 0; j < sv; j++) {
+        const j2 = wrap ? (j + 1) % sv : j + 1;
+        const a = at(i, j);
+        const b = at(i, j2);
+        const c = at(i + 1, j);
+        const d = at(i + 1, j2);
+        ix.push(a, c, b, b, c, d);
+      }
+    }
+    const addDisc = (loop: number[]) => {
+      const n = loop.length;
+      if (n < 3) return;
+      const mid = lungPoint(sideSign, (u0 + u1) * 0.5, (v0 + v1) * 0.5, 1);
+      const c = new THREE.Vector3();
+      for (const id of loop) c.add(new THREE.Vector3(pos[id * 3]!, pos[id * 3 + 1]!, pos[id * 3 + 2]!));
+      c.multiplyScalar(1 / n).lerp(mid, 0.2);
+      const rings = 5;
+      const start = pos.length / 3;
+      for (let r = 1; r <= rings; r++) {
+        const t = r / rings;
+        for (const id of loop) {
+          const p = new THREE.Vector3(pos[id * 3]!, pos[id * 3 + 1]!, pos[id * 3 + 2]!).lerp(c, t);
+          pos.push(p.x, p.y, p.z);
+          uv.push(0.5, t);
+        }
+      }
+      const ringAt = (r: number, j: number) => (r === 0 ? loop[j]! : start + (r - 1) * n + j);
+      for (let r = 0; r < rings; r++) {
+        for (let j = 0; j < n; j++) {
+          const j2 = (j + 1) % n;
+          const a = ringAt(r, j);
+          const b = ringAt(r, j2);
+          const c0 = ringAt(r + 1, j);
+          const d0 = ringAt(r + 1, j2);
+          ix.push(a, b, c0, b, d0, c0);
+        }
+      }
+    };
+    if (wrap) {
+      const top: number[] = [];
+      const bot: number[] = [];
+      for (let j = 0; j < sv; j++) {
+        top.push(at(0, j));
+        bot.push(at(su, j));
+      }
+      addDisc(top);
+      addDisc(bot);
+    } else {
+      const loop: number[] = [];
+      for (let j = 0; j < cols; j++) loop.push(at(0, j));
+      for (let i = 1; i <= su; i++) loop.push(at(i, cols - 1));
+      for (let j = cols - 2; j >= 0; j--) loop.push(at(su, j));
+      for (let i = su - 1; i >= 1; i--) loop.push(at(i, 0));
+      addDisc(loop);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(ix);
+    geo.computeVertexNormals();
+    return geo;
+  };
   const placeLung = (geo: THREE.BufferGeometry, key: string, label: string, side: CircPart["side"], blurb: string, drift: THREE.Vector3, weight: number, cat: CatId = "lungs") => {
     parts.push({ geo, key, label, cat, side, blurb, center: hub, orient, drift, weight });
   };
-  placeLung(band(1, 0.02, 0.4), "heart:rul", "Right upper lobe", "right", "Above the horizontal fissure. The apical bronchus enters it from the hilum.", D(1, 0.9, 0.2), 1);
-  placeLung(band(1, 0.34, 0.6, 0.02, 0.48), "heart:rml", "Right middle lobe", "right", "The small anterior lobe between the horizontal and oblique fissures.", D(0.7, 0.05, 1), 1.05);
-  placeLung(band(1, 0.52, 0.98), "heart:rll", "Right lower lobe", "right", "Below the oblique fissure, sitting on the diaphragm.", D(0.8, -0.75, -0.25), 1);
-  placeLung(band(-1, 0.02, 0.52), "heart:lul", "Left upper lobe", "left", "Includes the lingula. The cardiac notch is on its medial side.", D(-1, 0.85, 0.25), 1);
-  placeLung(band(-1, 0.46, 0.98), "heart:lll", "Left lower lobe", "left", "Below the oblique fissure, against the diaphragm.", D(-0.85, -0.7, -0.2), 1);
+  placeLung(solidLobe(1, 0.02, 0.4), "heart:rul", "Right upper lobe", "right", "Above the horizontal fissure. The apical bronchus enters it from the hilum.", D(1, 0.9, 0.2), 1);
+  placeLung(solidLobe(1, 0.34, 0.6, 0.02, 0.48), "heart:rml", "Right middle lobe", "right", "The small anterior lobe between the horizontal and oblique fissures.", D(0.7, 0.05, 1), 1.05);
+  placeLung(solidLobe(1, 0.52, 0.98), "heart:rll", "Right lower lobe", "right", "Below the oblique fissure, sitting on the diaphragm.", D(0.8, -0.75, -0.25), 1);
+  placeLung(solidLobe(-1, 0.02, 0.52), "heart:lul", "Left upper lobe", "left", "Includes the lingula. The cardiac notch is on its medial side.", D(-1, 0.85, 0.25), 1);
+  placeLung(solidLobe(-1, 0.46, 0.98), "heart:lll", "Left lower lobe", "left", "Below the oblique fissure, against the diaphragm.", D(-0.85, -0.7, -0.2), 1);
   placeLung(
     surface(18, 28, (u, v) => lungPoint(1, 0.02 + u * 0.96, v, 1.08)),
     "heart:pleura-right",

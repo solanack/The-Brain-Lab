@@ -707,26 +707,35 @@ const LUNG_V = 256;
 let lungTex: { alb: THREE.CanvasTexture; surf: THREE.CanvasTexture } | null = null;
 
 function shadeLung(u: number, v: number): Ink {
-  const grain = fbm(u * 5.5, v * 7, 5, 4);
-  const pore = Math.pow(0.5 + 0.5 * Math.sin((u * 46 + v * 13) * Math.PI * 2), 2);
-  const lobule = 0.5 + 0.5 * Math.sin((u * 9 + v * 2.2) * Math.PI * 2);
-  const vessel = smooth(0.012, 0.0022, wrapDist(u, 0.18 + 0.06 * Math.sin(v * Math.PI * 3)));
-  const vessel2 = smooth(0.008, 0.0016, wrapDist(v, 0.62 + 0.04 * Math.sin(u * Math.PI * 5)));
-  const blood = Math.max(vessel, vessel2 * 0.7);
-  let r = lerp(0.78, 0.96, grain) * lerp(0.94, 1.02, lobule);
-  let g = lerp(0.74, 0.9, grain);
-  let b = lerp(0.72, 0.86, grain);
-  r *= lerp(0.9, 1, pore);
-  g *= lerp(0.9, 1, pore);
-  r = lerp(r, 0.5, blood * 0.55);
-  g = lerp(g, 0.24, blood * 0.55);
-  b = lerp(b, 0.22, blood * 0.55);
+  const grain = fbm(u * 4, v * 5, 4, 4);
+  const cu = fract(u * 8);
+  const cv = fract(v * 10);
+  const edge = Math.min(cu, 1 - cu, cv, 1 - cv);
+  const septum = 1 - smooth(0.015, 0.11, edge);
+  const lobule = 0.5 + 0.5 * Math.sin((Math.floor(u * 8) * 1.7 + Math.floor(v * 10) * 2.3) * 3.1);
+  const vessel = smooth(0.01, 0.002, wrapDist(u, 0.22 + 0.05 * Math.sin(v * Math.PI * 4)));
+  const vessel2 = smooth(0.007, 0.0014, wrapDist(v, 0.71 + 0.04 * Math.sin(u * Math.PI * 5)));
+  const blood = Math.max(vessel, vessel2 * 0.65);
+  const soot = hash(Math.floor(u * 90), Math.floor(v * 90));
+  const speck = soot > 0.94 ? (soot - 0.94) / 0.06 : 0;
+  let r = lerp(0.8, 0.98, grain) * lerp(0.92, 1.04, lobule);
+  let g = lerp(0.7, 0.88, grain);
+  let b = lerp(0.68, 0.84, grain);
+  r = lerp(r, r * 0.72, septum);
+  g = lerp(g, g * 0.7, septum);
+  b = lerp(b, b * 0.72, septum);
+  r = lerp(r, 0.52, blood * 0.7);
+  g = lerp(g, 0.24, blood * 0.7);
+  b = lerp(b, 0.24, blood * 0.7);
+  r = lerp(r, 0.42, speck * 0.65);
+  g = lerp(g, 0.42, speck * 0.65);
+  b = lerp(b, 0.46, speck * 0.65);
   return {
     r,
     g,
     b,
-    rough: lerp(0.55, 0.32, grain) * lerp(1, 0.8, 1 - pore),
-    height: 0.32 + grain * 0.28 + pore * 0.16 + blood * 0.1,
+    rough: lerp(0.62, 0.34, grain) * lerp(1, 0.75, septum),
+    height: 0.42 + grain * 0.22 + (1 - septum) * 0.16 + blood * 0.12 - speck * 0.08,
     mask: 1,
   };
 }
@@ -753,8 +762,8 @@ function lungTextures() {
   const surfTex = toTexture(surf, LUNG_U, LUNG_V);
   albTex.wrapS = albTex.wrapT = THREE.RepeatWrapping;
   surfTex.wrapS = surfTex.wrapT = THREE.RepeatWrapping;
-  albTex.repeat.set(2, 2);
-  surfTex.repeat.set(2, 2);
+  albTex.repeat.set(1, 1);
+  surfTex.repeat.set(1, 1);
   lungTex = { alb: albTex, surf: surfTex };
   return lungTex;
 }

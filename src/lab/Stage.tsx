@@ -272,14 +272,15 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
       mat.roughness = 0.48;
     }
     if (cat === "lungs") {
-      phys.roughness = 0.46;
-      phys.clearcoat = 0.12;
-      phys.clearcoatRoughness = 0.4;
-      phys.sheen = 0.22;
-      phys.sheenColor.set("#e7b8b4");
-      phys.sheenRoughness = 0.48;
-      mat.roughness = 0.46;
-      mat.color.set("#c99590");
+      phys.roughness = 0.4;
+      phys.clearcoat = 0.16;
+      phys.clearcoatRoughness = 0.34;
+      phys.sheen = 0.26;
+      phys.sheenColor.set("#d7b0a8");
+      phys.sheenRoughness = 0.42;
+      mat.roughness = 0.4;
+      mat.side = THREE.DoubleSide;
+      mat.color.set("#c48e88");
     }
     if (cat === "pericardium") {
       phys.roughness = 0.58;
@@ -303,7 +304,7 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
       phys.sheenColor.set("#f7f1ea");
       mat.roughness = 0.48;
       mat.transparent = true;
-      mat.opacity = 0.28;
+      mat.opacity = 0.14;
       mat.depthWrite = false;
       mat.side = THREE.DoubleSide;
       mat.color.set("#f4ece4");
@@ -2095,7 +2096,11 @@ function Specimen() {
                     mat.bumpScale = 0.4 / unitToMm;
                   }
                   if (part.cat === "heart" || part.cat === "pericardium") mat.side = THREE.DoubleSide;
-                  if (part.cat === "lungs") applyLungMap(mat);
+                  if (part.cat === "lungs") {
+                    applyLungMap(mat);
+                    mat.bumpScale = 1.8 / unitToMm;
+                    mat.side = THREE.DoubleSide;
+                  }
                   if (part.cat === "pericardium" || part.cat === "pleura") applyPericardiumMap(mat);
                   if (part.cat === "diaphragm") {
                     applyHeartMap(mat);
