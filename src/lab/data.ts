@@ -13,6 +13,8 @@ export const CAT_IDS = [
   "cerebellum",
   "arteries",
   "veins_sinuses",
+  "veins",
+  "heart",
   "cranial_nerves",
   "spinal_nerves",
   "peripheral",
@@ -220,6 +222,32 @@ export const CATEGORIES: CatMeta[] = [
     transparent: false,
   },
   {
+    id: "veins",
+    label: "Veins",
+    group: "Vessels & nerves",
+    blurb:
+      "Systemic veins: jugulars, subclavians, venae cavae, azygos, iliacs, and femorals. They return blood to the right atrium. The pulse is the same heart rate as the arteries, later and smaller.",
+    color: "#6a3858",
+    opacity: 1,
+    visible: true,
+    explode: 0.4,
+    rough: 0.38,
+    transparent: false,
+  },
+  {
+    id: "heart",
+    label: "Heart",
+    group: "Vessels & nerves",
+    blurb:
+      "Four chambers in the middle mediastinum. The right ventricle wraps the front, the left forms the apex, and fat sits in the grooves with the coronary arteries. Ventricles shorten and twist on the heart-rate beat. Atria contract just before that.",
+    color: "#8a3034",
+    opacity: 1,
+    visible: true,
+    explode: 1,
+    rough: 0.46,
+    transparent: false,
+  },
+  {
     id: "cranial_nerves",
     label: "Cranial nerves",
     group: "Vessels & nerves",
@@ -374,6 +402,30 @@ const PEARLS: Record<string, string> = {
     "Formed by the two vertebral arteries on the ventral pons. It ends as the posterior cerebral arteries.",
   "internal carotid":
     "Enters the cranial cavity through the petrous temporal bone and divides into the anterior and middle cerebral arteries after giving the ophthalmic and communicating branches.",
+  heart:
+    "The ventricles eject on each systole. That is the same beat the arteries flash on. The atria contract a little earlier. Raise Explode to separate every chamber.",
+  "left ventricle":
+    "Thick-walled chamber. It forms the apex and ejects into the aorta.",
+  "right ventricle":
+    "Thin anterior crescent. It ejects into the pulmonary trunk.",
+  "left atrium":
+    "Posterior chamber. The four pulmonary veins enter it.",
+  "right atrium":
+    "Receives the superior and inferior venae cavae.",
+  "interventricular septum":
+    "Muscle wall between the ventricles, continuous with the left ventricular wall.",
+  "interatrial septum":
+    "Wall between the atria.",
+  auricle:
+    "The atrial appendage. The right auricle overlaps the front of the atrium. The left is a small ear on the left.",
+  aorta:
+    "The ascending aorta leaves the left ventricle, arches over the pulmonary trunk, and descends along the spine. Its wall pulses with every ventricular ejection.",
+  "vena cava":
+    "The superior vena cava brings head and arm blood into the right atrium. The inferior vena cava brings the body below the diaphragm.",
+  jugular:
+    "The internal jugular vein runs in the carotid sheath and joins the subclavian vein to form the brachiocephalic vein.",
+  azygos:
+    "The azygos vein ascends on the right of the vertebral column and empties into the superior vena cava.",
   "superior sagittal":
     "The superior sagittal sinus runs in the attached edge of the falx and receives cortical veins and CSF from arachnoid granulations.",
   "transverse sinus":

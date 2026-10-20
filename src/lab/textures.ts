@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { CatId } from "./data";
 
-export type TextureKind = Exclude<CatId, "spinal_cord" | "spinal_nerves" | "peripheral" | "sympathetic"> | "cell" | "ecm";
+export type TextureKind = Exclude<CatId, "spinal_cord" | "spinal_nerves" | "peripheral" | "sympathetic" | "heart" | "veins"> | "cell" | "ecm";
 
 type Pack = {
   alb: THREE.CanvasTexture;
@@ -391,6 +391,8 @@ export function tissueTextures() {
   out.push(cord.alb, cord.surf);
   const nerve = nerveTextures();
   out.push(nerve.alb, nerve.surf);
+  const heart = heartTextures();
+  out.push(heart.alb, heart.surf);
   return out;
 }
 
@@ -638,6 +640,66 @@ export function applySpinalUv(mat: THREE.MeshStandardMaterial) {
   mat.roughnessMap = pack.surf;
   mat.bumpMap = pack.surf;
   mat.bumpScale = 0.001;
+}
+
+const HEART_U = 256;
+const HEART_V = 256;
+let heartTex: { alb: THREE.CanvasTexture; surf: THREE.CanvasTexture } | null = null;
+
+function shadeHeart(u: number, v: number): Ink {
+  const fiber = 0.5 + 0.5 * Math.sin((v * 36 + u * 8) * Math.PI * 2);
+  const grain = fbm(u * 3, v * 4, 4, 3);
+  const vessel = smooth(0.01, 0.002, wrapDist(u, 0.31 + 0.04 * Math.sin(v * Math.PI * 4)));
+  let r = lerp(0.82, 0.96, fiber) * lerp(0.94, 1.02, grain);
+  let g = lerp(0.74, 0.9, fiber);
+  let b = lerp(0.7, 0.86, fiber);
+  r = lerp(r, 0.55, vessel * 0.65);
+  g = lerp(g, 0.28, vessel * 0.65);
+  b = lerp(b, 0.26, vessel * 0.65);
+  return {
+    r,
+    g,
+    b,
+    rough: lerp(0.58, 0.36, fiber),
+    height: 0.4 + fiber * 0.22 + (grain - 0.5) * 0.08 + vessel * 0.12,
+    mask: 1,
+  };
+}
+
+function heartTextures() {
+  if (heartTex) return heartTex;
+  const alb = new Uint8ClampedArray(HEART_U * HEART_V * 4);
+  const surf = new Uint8ClampedArray(HEART_U * HEART_V * 4);
+  for (let y = 0; y < HEART_V; y++) {
+    for (let x = 0; x < HEART_U; x++) {
+      const ink = shadeHeart(x / HEART_U, y / HEART_V);
+      const i = (y * HEART_U + x) * 4;
+      alb[i] = sat(ink.r) * 255;
+      alb[i + 1] = sat(ink.g) * 255;
+      alb[i + 2] = sat(ink.b) * 255;
+      alb[i + 3] = 255;
+      surf[i] = sat(ink.height) * 255;
+      surf[i + 1] = sat(ink.rough) * 255;
+      surf[i + 2] = 255;
+      surf[i + 3] = 255;
+    }
+  }
+  const albTex = toTexture(alb, HEART_U, HEART_V);
+  const surfTex = toTexture(surf, HEART_U, HEART_V);
+  albTex.wrapS = albTex.wrapT = THREE.RepeatWrapping;
+  surfTex.wrapS = surfTex.wrapT = THREE.RepeatWrapping;
+  albTex.repeat.set(1, 2);
+  surfTex.repeat.set(1, 2);
+  heartTex = { alb: albTex, surf: surfTex };
+  return heartTex;
+}
+
+export function applyHeartMap(mat: THREE.MeshStandardMaterial) {
+  const pack = heartTextures();
+  mat.map = pack.alb;
+  mat.roughnessMap = pack.surf;
+  mat.bumpMap = pack.surf;
+  mat.bumpScale = 0.00025;
 }
 
 const NERVE_U = 256;
