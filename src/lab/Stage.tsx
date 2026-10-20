@@ -23,6 +23,7 @@ import { SCENARIO_BY_ID, circuitLinks, lostToCut, scenarioFocus, scenarioHit, ty
 import { applyHeartMap, applyLungMap, applyPericardiumMap, applyRepeating, applySpinalUv, applyTriplanar, nerveMaterial, tissueTextures } from "./textures";
 import { buildPeripheral } from "./nerves";
 import { buildCirculation } from "./heart";
+import { buildHeadNeck } from "./neck";
 
 type Side = "left" | "right" | "median";
 
@@ -182,6 +183,12 @@ function parcelColor(cat: CatId, index: number) {
     airway: [0.04, 0.08],
     globe: [0.04, 0.08],
     orbit: [0.01, 0.04],
+    hn_bone: [0.08, 0.12],
+    hn_muscle: [0.02, 0.06],
+    hn_vessel: [0.98, 1.02],
+    hn_nerve: [0.06, 0.1],
+    hn_gland: [0.96, 1],
+    hn_viscera: [0.04, 0.08],
   };
   const [a, b] = span[cat];
   const h = a + ((index * 0.61803398875) % 1) * (b - a);
@@ -210,7 +217,7 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
     cat === "orbit";
   const flesh = cat === "cortex" || cat === "cerebellum" || cat === "deep_grey" || cat === "brainstem";
   const vessel = cat === "arteries" || cat === "veins_sinuses" || cat === "veins";
-  const physical = wet || vessel || cat === "ventricles" || cat === "arachnoid" || cat === "globe" || cat === "heart" || cat === "lungs" || cat === "pericardium" || cat === "pleura" || cat === "diaphragm" || cat === "airway";
+  const physical = wet || vessel || cat === "ventricles" || cat === "arachnoid" || cat === "globe" || cat === "heart" || cat === "lungs" || cat === "pericardium" || cat === "pleura" || cat === "diaphragm" || cat === "airway" || cat === "hn_muscle" || cat === "hn_gland" || cat === "hn_viscera" || cat === "hn_vessel";
   const roughJitter = (hashUnit(seed) - 0.5) * 0.08;
   if (flesh) specimen.offsetHSL((hashUnit(seed + 3) - 0.5) * 0.008, 0, (hashUnit(seed + 9) - 0.5) * 0.012);
   const roughness = flesh
@@ -329,6 +336,26 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
       mat.roughness = 0.4;
       mat.color.set("#efe4d6");
     }
+    if (cat === "hn_muscle" || cat === "hn_gland" || cat === "hn_viscera") {
+      phys.roughness = cat === "hn_muscle" ? 0.52 : 0.44;
+      phys.clearcoat = 0.02;
+      phys.clearcoatRoughness = 0.78;
+      phys.sheen = cat === "hn_muscle" ? 0.1 : 0.06;
+      phys.sheenColor.set("#c48a84");
+      phys.envMapIntensity = 0.03;
+      mat.roughness = phys.roughness;
+      if (cat === "hn_muscle") {
+        phys.transmission = 0.05;
+        phys.thickness = 0.15;
+      }
+    }
+    if (cat === "hn_vessel") {
+      phys.roughness = 0.32;
+      phys.clearcoat = 0.08;
+      phys.clearcoatRoughness = 0.4;
+      phys.envMapIntensity = 0.12;
+      mat.roughness = 0.32;
+    }
     if (cat === "arachnoid") {
       phys.iridescence = 0;
       phys.clearcoat = 0;
@@ -357,6 +384,17 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
       mat.roughness = 0.38;
     }
   }
+  if (cat === "hn_bone") {
+    mat.roughness = 0.94;
+    mat.metalness = 0.02;
+    mat.envMapIntensity = 0.03;
+  }
+  if (cat === "hn_nerve") {
+    mat.roughness = 0.48;
+    mat.metalness = 0.02;
+    mat.envMapIntensity = 0.04;
+    mat.color.set("#e4a898");
+  }
   if (cat === "white_matter" || cat === "tracts") {
     mat.roughness = 0.92;
     mat.metalness = 0;
@@ -373,7 +411,20 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
     mat.polygonOffsetUnits = -2;
   }
   if (cat === "spinal_cord") applySpinalUv(mat);
-  else if (cat !== "heart" && cat !== "lungs" && cat !== "pericardium" && cat !== "pleura" && cat !== "diaphragm" && cat !== "airway")
+  else if (
+    cat !== "heart" &&
+    cat !== "lungs" &&
+    cat !== "pericardium" &&
+    cat !== "pleura" &&
+    cat !== "diaphragm" &&
+    cat !== "airway" &&
+    cat !== "hn_bone" &&
+    cat !== "hn_muscle" &&
+    cat !== "hn_vessel" &&
+    cat !== "hn_nerve" &&
+    cat !== "hn_gland" &&
+    cat !== "hn_viscera"
+  )
     applyTriplanar(mat, cat === "veins" ? "veins_sinuses" : cat === "spinal_nerves" || cat === "peripheral" || cat === "sympathetic" ? "cranial_nerves" : cat);
   mat.color.set(CAT_BY_ID[cat].color);
   if (cat === "cortex") mat.color.set("#d4a394");
@@ -1942,6 +1993,7 @@ function Specimen() {
             }
 
             const medullas = records.filter((r) => r.label === "Medulla oblongata");
+            let neckOrigin: THREE.Vector3 | null = null;
             if (medullas.length) {
               const inferior = superior.clone().negate();
               let minS = Infinity;
@@ -1975,6 +2027,7 @@ function Specimen() {
                 }
                 const startMm = THREE.MathUtils.clamp((radial / caudal.length) * unitToMm * 0.78, 4.2, 8.2);
                 const origin = acc.clone().addScaledVector(superior, 2.5 / unitToMm);
+                neckOrigin = origin.clone();
                 const built = buildSpinalCord(origin, inferior, anterior, rightAxis, unitToMm, startMm);
                 const cordColor = new THREE.Color(CAT_BY_ID.spinal_cord.color);
                 const cordMat = makeMaterial("spinal_cord", cordColor, 11);
@@ -2171,6 +2224,76 @@ function Specimen() {
             }
 
             addOrbitContents(records, directory, gltf.scene, anterior, superior, rightAxis, unitToMm);
+
+            if (neckOrigin) {
+              const globes = records
+                .filter((r) => r.cat === "globe" && (r.side === "left" || r.side === "right"))
+                .map((r) => ({ side: r.side as "left" | "right", at: r.restCenter.clone() }));
+              const along = (axis: THREE.Vector3) => {
+                const xs = [box.min.x, box.max.x];
+                const ys = [box.min.y, box.max.y];
+                const zs = [box.min.z, box.max.z];
+                let m = 0;
+                for (const x of xs) for (const y of ys) for (const z of zs) {
+                  m = Math.max(m, Math.abs((x - center.x) * axis.x + (y - center.y) * axis.y + (z - center.z) * axis.z));
+                }
+                return m;
+              };
+              for (const part of buildHeadNeck({
+                center,
+                origin: neckOrigin,
+                superior,
+                anterior,
+                right: rightAxis,
+                unitToMm,
+                halfLat: along(rightAxis),
+                halfSup: along(superior),
+                halfAnt: along(anterior),
+                globes,
+              })) {
+                const color = new THREE.Color(part.color ?? CAT_BY_ID[part.cat].color);
+                const mat = makeMaterial(part.cat, color.clone(), part.label.length);
+                mat.color.copy(color);
+                if (part.opacity != null) {
+                  mat.transparent = true;
+                  mat.opacity = part.opacity;
+                  mat.depthWrite = false;
+                  mat.side = THREE.DoubleSide;
+                }
+                const mesh = new THREE.Mesh(part.geo, mat);
+                mesh.userData.key = part.key;
+                if (part.opacity != null) mesh.userData.opacityCap = part.opacity;
+                gltf.scene.add(mesh);
+                records.push({
+                  key: part.key,
+                  mesh,
+                  mat: mat as THREE.MeshStandardMaterial,
+                  cat: part.cat,
+                  side: part.side,
+                  label: part.label,
+                  region: "Head & neck",
+                  hay: `${part.label} ${part.side} head neck skull carotid facial thyroid larynx`.toLowerCase(),
+                  restCenter: meshCenter(mesh),
+                  restPosition: mesh.position.clone(),
+                  dir: part.drift.clone().normalize(),
+                  radius: meshRadius(mesh),
+                  weight: CAT_BY_ID[part.cat].explode,
+                  glassy: part.opacity != null,
+                  specimen: color.clone(),
+                  parcel: parcelColor(part.cat, part.label.length),
+                  placed: false,
+                });
+                directory.push({
+                  key: part.key,
+                  label: part.label,
+                  side: part.side,
+                  region: "Head & neck",
+                  cat: part.cat,
+                  ta2: "Head & neck",
+                  blurb: part.blurb,
+                });
+              }
+            }
 
             const anchors: Frame["anchors"] = {};
             for (const recipe of RECIPES) {
@@ -2411,7 +2534,7 @@ function Specimen() {
     if (!layersOpened) {
       layersOpened = true;
       const visible = { ...state.visible };
-      for (const cat of CATEGORIES) visible[cat.id] = true;
+      for (const cat of CATEGORIES) if (!cat.id.startsWith("hn_")) visible[cat.id] = true;
       useLab.getState().patch({ visible });
     }
     const breathPeriod = 60 / Math.max(4, state.rr);
@@ -2533,6 +2656,8 @@ function Specimen() {
         op = Math.max(op, 1);
       }
       op = THREE.MathUtils.clamp(op, 0, 1);
+      const opacityCap = rec.mesh.userData.opacityCap as number | undefined;
+      if (opacityCap != null) op = Math.min(op, opacityCap);
       rec.mat.opacity = THREE.MathUtils.damp(rec.mat.opacity, op, 8, d);
       const glassy = rec.glassy || op < 0.985;
       if (rec.mat.transparent !== glassy) rec.mat.transparent = glassy;

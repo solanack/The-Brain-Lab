@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { CatId } from "./data";
 
-export type TextureKind = Exclude<CatId, "spinal_cord" | "spinal_nerves" | "peripheral" | "sympathetic" | "heart" | "veins" | "lungs" | "pericardium" | "pleura" | "diaphragm" | "airway"> | "cell" | "ecm";
+export type TextureKind = Exclude<CatId, "spinal_cord" | "spinal_nerves" | "peripheral" | "sympathetic" | "heart" | "veins" | "lungs" | "pericardium" | "pleura" | "diaphragm" | "airway" | "hn_bone" | "hn_muscle" | "hn_vessel" | "hn_nerve" | "hn_gland" | "hn_viscera"> | "cell" | "ecm";
 
 type Pack = {
   alb: THREE.CanvasTexture;

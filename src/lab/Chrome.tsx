@@ -548,6 +548,50 @@ function Layers() {
         >
           Exploded
         </Pill>
+        <Pill
+          onClick={() => {
+            const state = useLab.getState();
+            const visible = { ...state.visible, hn_bone: true, hn_gland: true, hn_nerve: true, hn_muscle: false, hn_vessel: false, hn_viscera: false };
+            const hidden = { ...state.hidden };
+            for (const item of state.directory) {
+              if (!item.cat.startsWith("hn_")) continue;
+              hidden[item.key] = !/facial|parotid|mandible|zygomatic arch|masseter/i.test(item.label);
+            }
+            const focus = state.directory.find((item) => item.label === "Facial nerve trunk");
+            state.patch({
+              visible,
+              hidden,
+              opacity: { ...state.opacity, cortex: 0.08, hn_bone: 0.35, hn_gland: 1, hn_nerve: 1 },
+              explode: 0.35,
+              isolated: null,
+            });
+            if (focus) state.request({ type: "part", key: focus.key });
+          }}
+        >
+          Parotid
+        </Pill>
+        <Pill
+          onClick={() => {
+            const state = useLab.getState();
+            const visible = { ...state.visible, hn_gland: true, hn_nerve: true, hn_vessel: true, hn_viscera: true, hn_bone: false, airway: true };
+            const hidden = { ...state.hidden };
+            for (const item of state.directory) {
+              if (!item.cat.startsWith("hn_") && item.cat !== "airway") continue;
+              hidden[item.key] = !/thyroid|parathyroid|recurrent|larynx|cricoid|trachea|esophagus/i.test(item.label);
+            }
+            const focus = state.directory.find((item) => item.label === "Thyroid gland");
+            state.patch({
+              visible,
+              hidden,
+              opacity: { ...state.opacity, cortex: 0.05, hn_gland: 1, hn_nerve: 1, hn_vessel: 1, hn_viscera: 0.85, airway: 0.7 },
+              explode: 0.42,
+              isolated: null,
+            });
+            if (focus) state.request({ type: "part", key: focus.key });
+          }}
+        >
+          Thyroid
+        </Pill>
       </div>
 
       <label className="flex h-11 items-center gap-2 rounded-full border border-border bg-surface px-3">
@@ -684,6 +728,15 @@ function Dossier() {
             <LocateFixed className="size-4" />
             Frame
           </button>
+          {(meta.cat === "hn_nerve" || meta.cat === "hn_vessel") && (
+            <button
+              type="button"
+              className="flex h-11 items-center gap-2 rounded-full bg-surface-2 px-3 text-sm"
+              onClick={() => patch({ query: meta.label.split(" ").slice(0, 2).join(" ") })}
+            >
+              Trace
+            </button>
+          )}
           <button
             type="button"
             className="flex h-11 items-center gap-2 rounded-full bg-surface-2 px-3 text-sm"

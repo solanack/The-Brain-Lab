@@ -26,6 +26,12 @@ export const CAT_IDS = [
   "sympathetic",
   "globe",
   "orbit",
+  "hn_bone",
+  "hn_muscle",
+  "hn_vessel",
+  "hn_nerve",
+  "hn_gland",
+  "hn_viscera",
 ] as const;
 
 export type CatId = (typeof CAT_IDS)[number];
@@ -390,13 +396,85 @@ export const CATEGORIES: CatMeta[] = [
     rough: 0.55,
     transparent: false,
   },
+  {
+    id: "hn_bone",
+    label: "Head & neck bone",
+    group: "Head & neck",
+    blurb: "Calvaria, facial skeleton, mandible, hyoid, and C1–C7. Teaching shapes registered to this specimen, not a CT. Off in the intact brain view.",
+    color: "#e4d5c2",
+    opacity: 1,
+    visible: false,
+    explode: 1.05,
+    rough: 0.94,
+    transparent: false,
+  },
+  {
+    id: "hn_muscle",
+    label: "Head & neck muscle",
+    group: "Head & neck",
+    blurb: "Mastication, the major facial muscles, strap muscles, sternocleidomastoid, trapezius, and scalenes. Groups, not every fiber. Off until the neck is opened.",
+    color: "#a85a52",
+    opacity: 1,
+    visible: false,
+    explode: 0.9,
+    rough: 0.52,
+    transparent: false,
+  },
+  {
+    id: "hn_vessel",
+    label: "Neck vessels",
+    group: "Head & neck",
+    blurb: "Carotid system and the internal jugular vein. The cervical internal carotid is drawn up to the skull base to meet the artery already in the head.",
+    color: "#c44048",
+    opacity: 1,
+    visible: false,
+    explode: 0.75,
+    rough: 0.34,
+    transparent: false,
+  },
+  {
+    id: "hn_nerve",
+    label: "Neck nerves",
+    group: "Head & neck",
+    blurb: "Facial nerve through the parotid, trigeminal branches, hypoglossal, cervical vagus, recurrent laryngeal, accessory, cervical plexus, and brachial plexus roots.",
+    color: "#e4a898",
+    opacity: 1,
+    visible: false,
+    explode: 0.8,
+    rough: 0.48,
+    transparent: false,
+  },
+  {
+    id: "hn_gland",
+    label: "Glands",
+    group: "Head & neck",
+    blurb: "Parotid, submandibular, thyroid, and the four parathyroids. Parathyroid sites are the usual positions, not a scan.",
+    color: "#d7a098",
+    opacity: 1,
+    visible: false,
+    explode: 0.95,
+    rough: 0.44,
+    transparent: false,
+  },
+  {
+    id: "hn_viscera",
+    label: "Neck viscera",
+    group: "Head & neck",
+    blurb: "Larynx, pharynx, cervical esophagus, carotid sheath, and the retropharyngeal space. The cervical trachea continues as the airway layer.",
+    color: "#e7c2b4",
+    opacity: 1,
+    visible: false,
+    explode: 0.6,
+    rough: 0.46,
+    transparent: false,
+  },
 ];
 
 export const CAT_BY_ID: Record<CatId, CatMeta> = Object.fromEntries(
   CATEGORIES.map((c) => [c.id, c]),
 ) as Record<CatId, CatMeta>;
 
-export const GROUPS = ["Meninges", "Telencephalon", "Deep gray", "Fluid spaces", "Stem & cerebellum", "Vessels & nerves", "Peripheral nervous system", "Orbit & visual pathway", "Chest"];
+export const GROUPS = ["Meninges", "Telencephalon", "Deep gray", "Fluid spaces", "Stem & cerebellum", "Vessels & nerves", "Peripheral nervous system", "Orbit & visual pathway", "Chest", "Head & neck"];
 
 const PEARLS: Record<string, string> = {
   "precentral gyrus":
