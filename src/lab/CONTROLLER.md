@@ -6,6 +6,7 @@ You drive the live specimen. The page exposes `window.neurotome`. Speak the line
 
 - `neurotome.scenarios()` — every situation, with its note.
 - `neurotome.play(id)` — open one situation and return its note. Ids: `reach`, `see`, `hear`, `fear`, `speech`, `memory`, `breathe`, `autonomic`, `thyroid`, `exit`.
+- `neurotome.view("brain" | "neck" | "chest" | "nerves" | "everything")` — a dissection view. It sets the layers, the explode, and the camera. `brain` is the intact specimen.
 - `neurotome.next()` — advance that situation one stop and return the new note.
 - `neurotome.tours()` — the three scripted tours.
 - `neurotome.run("overview" | "vision" | "breathing")` — play a tour. Each line lasts about 8 seconds. Read the lines from `tours()` as they appear on screen.

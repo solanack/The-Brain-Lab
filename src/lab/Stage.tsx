@@ -20,6 +20,7 @@ import {
 } from "./data";
 import { useLab, type Axis, type Meta } from "./store";
 import { SCENARIO_BY_ID, circuitLinks, glowHit, lostToCut, scenarioFocus, scenarioHit, type ModuleStop } from "./scenarios";
+import { VIEW_BY_ID } from "./views";
 import { applyHeartMap, applyLungMap, applyPericardiumMap, applyRepeating, applySpinalUv, applyTriplanar, nerveMaterial, tissueTextures } from "./textures";
 import { buildPeripheral } from "./nerves";
 import { buildCirculation } from "./heart";
@@ -1050,6 +1051,38 @@ function pointAlong(rec: Rec, superior: THREE.Vector3, t: number, bias?: THREE.V
     }
   }
   return best;
+}
+
+const _box = new THREE.Box3();
+const _size = new THREE.Vector3();
+const _corner = new THREE.Vector3();
+
+function frameRegion(frame: Frame, cats: string[], explode: number, retract: number, excised: string[], aim: [number, number, number]) {
+  _box.makeEmpty();
+  for (const rec of frame.records) {
+    if (rec.key.startsWith("env:") || rec.key.startsWith("tissue:")) continue;
+    if (!cats.includes(rec.cat)) continue;
+    visualTarget(rec, frame, explode, retract, excised, _desired);
+    const r = rec.radius;
+    _corner.copy(_desired);
+    _box.expandByPoint(_corner);
+    _corner.addScalar(r);
+    _box.expandByPoint(_corner);
+    _corner.addScalar(-2 * r);
+    _box.expandByPoint(_corner);
+  }
+  if (_box.isEmpty()) return null;
+  const target = _box.getCenter(new THREE.Vector3());
+  const span = Math.max(_box.getSize(_size).x, _size.y, _size.z);
+  const dist = Math.max(span * 2.05, frame.maxDim * 0.42);
+  _view
+    .copy(frame.anterior)
+    .multiplyScalar(aim[0])
+    .addScaledVector(frame.right, aim[1])
+    .addScaledVector(frame.superior, aim[2]);
+  if (_view.lengthSq() < 1e-8) _view.copy(frame.anterior);
+  _view.normalize();
+  return { cam: target.clone().addScaledVector(_view, dist), target };
 }
 
 function visualTarget(rec: Rec, frame: Frame, explode: number, retract: number, excised: string[], out: THREE.Vector3) {
@@ -2533,9 +2566,11 @@ function Specimen() {
     const state = useLab.getState();
     if (!layersOpened) {
       layersOpened = true;
-      const visible = { ...state.visible };
-      for (const cat of CATEGORIES) if (!cat.id.startsWith("hn_")) visible[cat.id] = true;
-      useLab.getState().patch({ visible });
+      if (!state.view) {
+        const visible = { ...state.visible };
+        for (const cat of CATEGORIES) visible[cat.id] = true;
+        useLab.getState().patch({ visible });
+      }
     }
     const breathPeriod = 60 / Math.max(4, state.rr);
     const breathPhase = ((performance.now() / 1000) % breathPeriod) / breathPeriod;
@@ -2548,6 +2583,13 @@ function Specimen() {
       const intent = state.intent;
       if (intent?.type === "home") {
         fly.current = { cam: frame.homeCam.clone(), target: frame.homeTarget.clone() };
+      } else if (intent?.type === "view") {
+        const spec = VIEW_BY_ID[intent.id];
+        if (!spec || spec.home) fly.current = { cam: frame.homeCam.clone(), target: frame.homeTarget.clone() };
+        else {
+          const shot = frameRegion(frame, spec.frame, state.explode, state.retract, state.excised, spec.aim);
+          if (shot) fly.current = shot;
+        }
       } else if (intent?.type === "part") {
         const rec = frame.records.find((item) => item.key === intent.key);
         if (rec) {

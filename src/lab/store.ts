@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { CAT_IDS, CATEGORIES, type CatId, type SampleId } from "./data";
 import type { ScenarioId } from "./scenarios";
+import type { ViewId } from "./views";
 
 export type Meta = {
   key: string;
@@ -20,6 +21,7 @@ export type Intent =
   | { type: "home" }
   | { type: "part"; key: string }
   | { type: "sample" }
+  | { type: "view"; id: ViewId }
   | null;
 
 type Optics = {
@@ -68,6 +70,7 @@ export type LabState = {
   intentNonce: number;
   tour: { id: ScenarioId; index: number } | null;
   scenario: ScenarioId | null;
+  view: ViewId | null;
   restoreOpacity: Record<CatId, number> | null;
   optics: Optics;
   brief: boolean;
@@ -120,8 +123,8 @@ export const useLab = create<LabState>((set, get) => ({
   ...fresh,
   sample: "m1",
   strataOn: {},
-  light: { key: 0.26, fill: 0.16, rim: 0.08, trans: 0.04, temp: 0.7 },
-  quality: "medium",
+  light: { key: 5, fill: 2, rim: 3, trans: 2, temp: 1 },
+  quality: "high",
   hr: 68,
   rr: 14,
   turntable: false,
@@ -129,6 +132,7 @@ export const useLab = create<LabState>((set, get) => ({
   intentNonce: 0,
   tour: null,
   scenario: null,
+  view: null as ViewId | null,
   restoreOpacity: null,
   optics: { distanceMm: 0, approach: "—", count: 0, unitToMm: 1000 },
   brief: true,
@@ -165,6 +169,8 @@ export const useLab = create<LabState>((set, get) => ({
       intent: { type: "home" },
       intentNonce: get().intentNonce + 1,
       tour: null,
+      scenario: null,
+      view: null,
       restoreOpacity: null,
     }),
   setOptics: (optics) => {

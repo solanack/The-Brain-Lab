@@ -16,6 +16,7 @@ import {
 import { CATEGORIES, GROUPS, RECIPES, type CatId, type SampleId } from "./data";
 import { CONTROLLER_TOURS, SCENARIOS, SCENARIO_BY_ID, scenarioHit, type ScenarioId } from "./scenarios";
 import { useLab, type Axis } from "./store";
+import { VIEWS, VIEW_BY_ID, type ViewId } from "./views";
 
 function Meter({
   label,
@@ -129,6 +130,14 @@ export function Chrome() {
         const note = SCENARIO_BY_ID[id].note;
         setCaption(note);
         return note;
+      },
+      view: (id: ViewId) => {
+        clear();
+        const spec = VIEW_BY_ID[id];
+        if (!spec) return null;
+        applyView(id);
+        setCaption(spec.title);
+        return spec.title;
       },
       next: () => {
         const current = useLab.getState().tour;
@@ -358,6 +367,7 @@ function closeModule() {
   state.patch({
     scenario: null,
     tour: null,
+    view: null,
     opacity: state.restoreOpacity ?? state.opacity,
     visible: savedView?.visible ?? state.visible,
     hidden: savedView?.hidden ?? state.hidden,
@@ -374,6 +384,31 @@ function closeModule() {
 
 let savedView: { visible: Record<string, boolean>; hidden: Record<string, boolean>; explode: number } | null = null;
 
+function applyView(id: ViewId) {
+  const spec = VIEW_BY_ID[id];
+  const visible = Object.fromEntries(CATEGORIES.map((cat) => [cat.id, spec.show.includes(cat.id)])) as Record<CatId, boolean>;
+  const opacity = Object.fromEntries(CATEGORIES.map((cat) => [cat.id, cat.opacity])) as Record<CatId, number>;
+  for (const [cat, value] of Object.entries(spec.fade)) opacity[cat as CatId] = value;
+  savedView = null;
+  const state = useLab.getState();
+  state.patch({
+    view: id,
+    scenario: null,
+    tour: null,
+    visible,
+    opacity,
+    hidden: {},
+    isolated: null,
+    sectionOn: false,
+    tissue: false,
+    selected: null,
+    restoreOpacity: null,
+    explode: spec.explode,
+    sheet: null,
+  });
+  state.request({ type: "view", id });
+}
+
 function openModule(id: ScenarioId) {
   const state = useLab.getState();
   const spec = SCENARIO_BY_ID[id];
@@ -387,6 +422,7 @@ function openModule(id: ScenarioId) {
   const restoreOpacity = state.restoreOpacity ?? { ...state.opacity };
   state.patch({
     scenario: id,
+    view: null,
     tour: { id, index: 0 },
     visible,
     hidden,
@@ -855,11 +891,17 @@ function Tools() {
   const measuring = useLab((s) => s.measuring);
   const sheet = useLab((s) => s.sheet);
   const scenario = useLab((s) => s.scenario);
+  const view = useLab((s) => s.view);
   const patch = useLab((s) => s.patch);
   const axes: Axis[] = ["axial", "coronal", "sagittal"];
   const setScenario = (id: ScenarioId | null) => (id ? openModule(id) : closeModule());
   return (
     <>
+      {VIEWS.map((item) => (
+        <Pill key={item.id} active={view === item.id} onClick={() => applyView(item.id)}>
+          {item.title}
+        </Pill>
+      ))}
       <div className="w-36 shrink-0">
         <Meter label="Explode" min={0} max={1} step={0.01} value={explode} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => patch({ explode: v })} />
       </div>
