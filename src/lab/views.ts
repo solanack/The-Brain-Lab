@@ -55,11 +55,11 @@ export const VIEWS: LabView[] = [
   {
     id: "chest",
     title: "Chest",
-    show: ["heart", "lungs", "pleura", "airway", "diaphragm", "pericardium"],
-    fade: { pleura: 0.2, pericardium: 0.4 },
+    show: ["heart", "lungs", "pleura", "airway", "diaphragm", "pericardium", "cage"],
+    fade: { pleura: 0.2, pericardium: 0.4, cage: 0.55 },
     explode: 0.42,
     home: false,
-    frame: ["heart", "lungs", "pleura", "airway", "diaphragm", "pericardium"],
+    frame: ["heart", "lungs", "pleura", "airway", "diaphragm", "pericardium", "cage"],
     aim: [1, 0.32, 0.1],
   },
   {

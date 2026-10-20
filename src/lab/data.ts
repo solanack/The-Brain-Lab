@@ -32,6 +32,7 @@ export const CAT_IDS = [
   "hn_nerve",
   "hn_gland",
   "hn_viscera",
+  "cage",
 ] as const;
 
 export type CatId = (typeof CAT_IDS)[number];
@@ -467,6 +468,18 @@ export const CATEGORIES: CatMeta[] = [
     explode: 0.6,
     rough: 0.46,
     transparent: false,
+  },
+  {
+    id: "cage",
+    label: "Thoracic cage",
+    group: "Chest",
+    blurb: "Ribs 1–12, the sternum, the clavicles, and T1–T12, continuing the cervical spine. Bone only. The heart and lungs sit inside it. Teaching shapes, not a CT.",
+    color: "#e4d5c2",
+    opacity: 0.72,
+    visible: false,
+    explode: 0.85,
+    rough: 0.94,
+    transparent: true,
   },
 ];
 

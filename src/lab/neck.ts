@@ -217,7 +217,7 @@ export function buildHeadNeck(opts: {
     push(bar(symph, hyoidS, mm(2.6), mm(1.8), 5), `hn:suprahyoid:${side}`, "Suprahyoid muscles", "hn_muscle", side, "Digastric, mylohyoid, and geniohyoid, as one group. They raise the hyoid. The marginal mandibular branch crosses the digastric.", anterior.clone().add(superior).normalize(), "#b0645c");
 
     const mastoid = origin.clone().addScaledVector(lat, mm(48)).addScaledVector(anterior, mm(-4)).addScaledVector(superior, mm(2));
-    const sternum = neck(168, 36, s(18));
+    const sternum = neck(128, 148, s(22));
     push(bar(mastoid, sternum, mm(5.5), mm(3.2), 8), `hn:scm:${side}`, "Sternocleidomastoid", "hn_muscle", side, "From the mastoid to the sternum and clavicle. It divides the neck into anterior and posterior triangles. The accessory nerve enters its deep face.", lat, "#a85850");
 
     const nuchal = origin.clone().addScaledVector(anterior, mm(-18)).addScaledVector(superior, mm(8)).addScaledVector(lat, mm(8));
@@ -225,7 +225,7 @@ export function buildHeadNeck(opts: {
     push(bar(nuchal, trap, mm(6), mm(3), 7), `hn:trapezius:${side}`, "Trapezius", "hn_muscle", side, "The upper fibers form the posterior border of the posterior triangle. The accessory nerve runs on the deep surface.", lat.clone().add(inferior).normalize(), "#9c524c");
 
     const tubercle = neck(48, -2, s(24));
-    const rib = neck(150, 8, s(48));
+    const rib = neck(124, 24, s(72));
     push(bar(tubercle, rib, mm(3.4), mm(2.4), 6), `hn:scalene:${side}`, "Scalene muscles", "hn_muscle", side, "Anterior and middle scalene, as one strap. The brachial plexus and the subclavian artery pass between them.", lat, "#965048");
 
     const smf = mastoid.clone().addScaledVector(anterior, mm(8)).addScaledVector(inferior, mm(4));
@@ -356,6 +356,67 @@ export function buildHeadNeck(opts: {
 
   const isthmus = ball(neck(96, 28, 0), mm(8), mm(6), mm(5), 8);
   push(isthmus, "hn:isthmus", "Thyroid isthmus", "hn_gland", "median", "Crosses the front of the 2nd to 4th tracheal rings. The pyramidal lobe, when present, climbs from here.", anterior, "#c45a58");
+
+  const plate = (c: THREE.Vector3, lat: number, sup: number, ant: number) => {
+    const geo = new THREE.BoxGeometry(lat, sup, ant);
+    geo.applyMatrix4(new THREE.Matrix4().makeBasis(right, superior, anterior));
+    geo.translate(c.x, c.y, c.z);
+    return geo;
+  };
+  const tDown = (i: number) => 116 + i * 18.5;
+  const bone = "#e4d5c2";
+  for (let i = 0; i < 12; i++) {
+    const down = tDown(i);
+    const body = neck(down, -10, 0);
+    const spinous = neck(down + 4 + i * 0.35, -28, 0);
+    push(
+      merge([ball(body, mm(15 + i * 0.35), mm(8), mm(13), 8), bar(body, spinous, mm(3.4), mm(2.4), 5)]),
+      `cage:t${i + 1}`,
+      `Thoracic vertebra T${i + 1}`,
+      "cage",
+      "median",
+      i === 0
+        ? "Continues the cervical spine. Rib 1 articulates here. The lung apex rises above this level."
+        : i === 11
+          ? "The last thoracic vertebra. The diaphragm crura attach near here, below the dome."
+          : `Vertebral body and a downward spinous process. Rib ${i + 1} articulates with it. The spinal nerve leaves under the pedicle.`,
+      anterior.clone().negate(),
+      bone,
+    );
+  }
+  push(plate(neck(134, 150, 0), mm(52), mm(40), mm(12)), "cage:manubrium", "Manubrium", "cage", "median", "The upper sternum. The clavicles and the first ribs meet it. The jugular notch is the top edge.", anterior, bone);
+  push(plate(neck(198, 154, 0), mm(34), mm(92), mm(10)), "cage:sternum", "Sternal body", "cage", "median", "Ribs 2–7 reach it through their costal cartilages. The right ventricle lies immediately behind it.", anterior, bone);
+  push(plate(neck(256, 148, 0), mm(16), mm(26), mm(7)), "cage:xiphoid", "Xiphoid process", "cage", "median", "The small tip of the sternum. The costal margin meets it. The diaphragm attaches to its back.", anterior, bone);
+
+  for (const sign of [1, -1] as const) {
+    const side = sign > 0 ? "right" : "left";
+    const s = (n: number) => n * sign;
+    const lat = right.clone().multiplyScalar(sign);
+    const clav = merge([
+      bar(neck(126, 146, s(24)), neck(114, 96, s(78)), mm(6), mm(5.2), 7),
+      bar(neck(114, 96, s(78)), neck(132, 16, s(148)), mm(5.2), mm(4.4), 7),
+    ]);
+    push(clav, `cage:clavicle:${side}`, "Clavicle", "cage", side, "From the manubrium to the shoulder. The subclavian vessels and the brachial plexus pass behind its medial third.", lat.clone().add(superior).normalize(), bone);
+    for (let i = 0; i < 12; i++) {
+      const headDown = tDown(i);
+      const drop = 4 + i * 2.6;
+      const reach = [74, 102, 124, 140, 152, 154, 146, 136, 122, 104, 78, 58][i]!;
+      const frontAnt = i < 7 ? 150 : i < 10 ? 128 - (i - 7) * 16 : 36;
+      const frontLat = i < 7 ? 18 : i < 10 ? 36 + (i - 7) * 10 : reach * 0.85;
+      const head = neck(headDown, -4, s(16));
+      const angle = neck(headDown + drop * 0.28, -22, s(reach * 0.62));
+      const shaft = neck(headDown + drop * 0.62, 28, s(reach));
+      const end = neck(headDown + drop, frontAnt, s(frontLat));
+      const thick = i === 0 ? 5.5 : 4.2;
+      const note =
+        i < 7
+          ? `True rib. The shaft runs outside the lung and the anterior end is costal cartilage reaching the sternum. The intercostal nerve and vessels sit in the groove under the shaft.`
+          : i < 10
+            ? "Joins the costal margin rather than the sternum. The intercostal nerve runs under the shaft."
+            : "Floating rib. It ends in the body wall and does not reach the sternum.";
+      push(merge([bar(head, angle, mm(thick), mm(thick * 0.85), 5), bar(angle, shaft, mm(thick * 0.85), mm(3.4), 5), bar(shaft, end, mm(3.4), mm(2.6), 5)]), `cage:rib${i + 1}:${side}`, `Rib ${i + 1}`, "cage", side, note, lat, bone);
+    }
+  }
 
   return parts;
 }

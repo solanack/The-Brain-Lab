@@ -190,6 +190,7 @@ function parcelColor(cat: CatId, index: number) {
     hn_nerve: [0.06, 0.1],
     hn_gland: [0.96, 1],
     hn_viscera: [0.04, 0.08],
+    cage: [0.07, 0.11],
   };
   const [a, b] = span[cat];
   const h = a + ((index * 0.61803398875) % 1) * (b - a);
@@ -385,7 +386,7 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
       mat.roughness = 0.38;
     }
   }
-  if (cat === "hn_bone") {
+  if (cat === "hn_bone" || cat === "cage") {
     mat.roughness = 0.94;
     mat.metalness = 0.02;
     mat.envMapIntensity = 0.03;
@@ -424,7 +425,8 @@ function makeMaterial(cat: CatId, specimen: THREE.Color, seed = 1) {
     cat !== "hn_vessel" &&
     cat !== "hn_nerve" &&
     cat !== "hn_gland" &&
-    cat !== "hn_viscera"
+    cat !== "hn_viscera" &&
+    cat !== "cage"
   )
     applyTriplanar(mat, cat === "veins" ? "veins_sinuses" : cat === "spinal_nerves" || cat === "peripheral" || cat === "sympathetic" ? "cranial_nerves" : cat);
   mat.color.set(CAT_BY_ID[cat].color);
@@ -1193,6 +1195,9 @@ function visualTarget(rec: Rec, frame: Frame, explode: number, retract: number, 
     case "airway":
       out.addScaledVector(rec.dir, e * rec.weight * md * 0.4);
       out.addScaledVector(frame.anterior, e * md * 0.1);
+      break;
+    case "cage":
+      out.addScaledVector(rec.dir, e * rec.weight * md * 0.42);
       break;
     case "globe":
     case "orbit":
@@ -2304,8 +2309,8 @@ function Specimen() {
                   cat: part.cat,
                   side: part.side,
                   label: part.label,
-                  region: "Head & neck",
-                  hay: `${part.label} ${part.side} head neck skull carotid facial thyroid larynx`.toLowerCase(),
+                  region: part.cat === "cage" ? "Thoracic cage" : "Head & neck",
+                  hay: `${part.label} ${part.side} ${part.cat === "cage" ? "rib sternum clavicle thoracic vertebra cage" : "head neck skull carotid facial thyroid larynx"}`.toLowerCase(),
                   restCenter: meshCenter(mesh),
                   restPosition: mesh.position.clone(),
                   dir: part.drift.clone().normalize(),
@@ -2320,9 +2325,9 @@ function Specimen() {
                   key: part.key,
                   label: part.label,
                   side: part.side,
-                  region: "Head & neck",
+                  region: part.cat === "cage" ? "Thoracic cage" : "Head & neck",
                   cat: part.cat,
-                  ta2: "Head & neck",
+                  ta2: part.cat === "cage" ? "Thoracic cage" : "Head & neck",
                   blurb: part.blurb,
                 });
               }
