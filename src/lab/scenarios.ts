@@ -418,6 +418,38 @@ export function lostToCut(scenario: Scenario, index: number, label: string, cat:
   return false;
 }
 
+function labelListed(label: string, keys: string[]) {
+  const hay = label.toLowerCase();
+  for (const key of keys) {
+    const at = hay.indexOf(key);
+    if (at < 0) continue;
+    const before = at === 0 || !/[a-z0-9]/.test(hay[at - 1] ?? "");
+    const after = at + key.length >= hay.length || !/[a-z0-9]/.test(hay[at + key.length] ?? "");
+    if (before && after) return true;
+  }
+  return false;
+}
+
+function stopNames(stop: ModuleStop, label: string, cat: CatId) {
+  if (stop.label) return labelListed(label, [stop.label.toLowerCase()]);
+  return stop.cat === cat;
+}
+
+export function scenarioFocus(label: string, cat: CatId, side: "left" | "right" | "median", scenario: Scenario) {
+  if (!scenarioHit(label, cat, scenario)) return false;
+  if (side === "median") return true;
+  if (scenario.stops.some((stop) => stop.loss?.both && labelListed(label, (stop.loss.labels ?? []).map((item) => item.toLowerCase())))) return true;
+  const named = scenario.stops.filter((stop) => stopNames(stop, label, cat));
+  const labeled = named.filter((stop) => stop.label);
+  const use = labeled.length ? labeled : named;
+  if (use.some((stop) => !stop.side)) return true;
+  const sides = use.map((stop) => stop.side).filter((item): item is "left" | "right" => item === "left" || item === "right");
+  if (sides.length) return sides.includes(side);
+  const tour = scenario.stops.map((stop) => stop.side).filter((item): item is "left" | "right" => item === "left" || item === "right");
+  if (!tour.length) return true;
+  return tour.includes(side);
+}
+
 export function scenarioHit(label: string, cat: CatId, scenario: Scenario) {
   if (scenario.cats.includes(cat)) return true;
   const hay = label.toLowerCase();

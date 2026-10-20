@@ -18,7 +18,7 @@ import {
   type Stratum,
 } from "./data";
 import { useLab, type Axis, type Meta } from "./store";
-import { SCENARIO_BY_ID, circuitLinks, lostToCut, scenarioHit, type ModuleStop } from "./scenarios";
+import { SCENARIO_BY_ID, circuitLinks, lostToCut, scenarioFocus, scenarioHit, type ModuleStop } from "./scenarios";
 import { applyRepeating, applySpinalUv, applyTriplanar, tissueTextures } from "./textures";
 
 type Side = "left" | "right" | "median";
@@ -2205,7 +2205,7 @@ function Specimen() {
       else {
         const spec = SCENARIO_BY_ID[state.scenario];
         const keys = new Set<string>();
-        for (const rec of frame.records) if (scenarioHit(rec.label, rec.cat, spec)) keys.add(rec.key);
+        for (const rec of frame.records) if (scenarioFocus(rec.label, rec.cat, rec.side, spec)) keys.add(rec.key);
         scenarioKeys.current = keys;
       }
     }
@@ -2223,6 +2223,10 @@ function Specimen() {
       if (state.side === "left" && rec.side === "right") op = 0;
       if (state.side === "right" && rec.side === "left") op = 0;
       if (state.hidden[rec.key]) op = 0;
+      if (scenarioOn) {
+        if (scenarioOn.has(rec.key)) op = Math.max(op, 0.96);
+        else op = Math.min(op, 0.02);
+      }
       if (state.selected === rec.key) op = Math.max(op, state.visible[rec.cat] ? 0.92 : op);
       if (state.tissue && state.sample === "hip" && rec.label === "Hippocampus" && rec.side === "left") {
         op = Math.max(op, 1);
