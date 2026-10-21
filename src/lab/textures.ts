@@ -122,9 +122,9 @@ function shade(kind: TextureKind, u: number, v: number): Ink {
     const open = Math.min(vein, cap);
     const base = lerp(0.52, 0.68, blot);
     return {
-      r: Math.min(0.75, base * lerp(0.78, 1, open)),
-      g: Math.min(0.66, base * lerp(0.6, 0.86, open) * lerp(0.98, 1.02, pores)),
-      b: Math.min(0.6, base * lerp(0.55, 0.8, open)),
+      r: Math.min(0.74, base * lerp(0.78, 1, open)),
+      g: Math.min(0.64, base * lerp(0.6, 0.86, open) * lerp(0.98, 1.02, pores)),
+      b: Math.min(0.58, base * lerp(0.55, 0.8, open)),
       rough: lerp(0.7, 0.4, open),
       height: 0.66 + (pores - 0.5) * 0.06 - (1 - vein) * 0.2 - (1 - cap) * 0.08,
       mask: 1,
@@ -538,7 +538,7 @@ export function applyTriplanar(mat: THREE.Material, kind: TextureKind) {
   ensureTextures();
   const pack = cache.get(kind);
   if (!pack) return;
-  mat.customProgramCacheKey = () => "neurotome-triplanar-v20";
+  mat.customProgramCacheKey = () => "neurotome-triplanar-v21";
   mat.onBeforeCompile = (shader) => {
     compileTriplanar(shader, pack);
     const fiber = mat.userData.fiber as THREE.Vector3 | undefined;

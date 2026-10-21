@@ -1825,8 +1825,8 @@ function addSectionCaps(records: Rec[], scene: THREE.Scene, radius: number) {
     rec.mesh.renderOrder = 3;
   }
   const capMat = new THREE.MeshStandardMaterial({
-    color: "#c9a090",
-    roughness: 0.97,
+    color: "#b58376",
+    roughness: 0.96,
     metalness: 0,
     envMapIntensity: 0,
     side: THREE.DoubleSide,
@@ -1859,6 +1859,7 @@ function Specimen() {
   const [booted, setBooted] = useState(false);
   const [unit, setUnit] = useState(1000);
   const fly = useRef<{ cam: THREE.Vector3; target: THREE.Vector3 } | null>(null);
+  const hoverRef = useRef<string | null>(null);
   const nonce = useRef(-1);
   const tourRef = useRef("");
   const scenarioRef = useRef<string | null>(null);
@@ -2618,11 +2619,50 @@ function Specimen() {
       }
       state.select(key);
     };
+    const tip = document.createElement("div");
+    tip.className = "pointer-events-none absolute left-0 top-0 z-20 rounded-full border border-border bg-bg/90 px-2 py-1 text-xs text-fg";
+    tip.style.opacity = "0";
+    el.parentElement?.appendChild(tip);
+    const onMove = (event: PointerEvent) => {
+      const rect = el.getBoundingClientRect();
+      ndc.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+      ray.setFromCamera(ndc, camera);
+      const root = rig.current;
+      if (!root) return;
+      const hit = ray.intersectObject(root, true).find((item) => item.object.visible);
+      let found: string | null = null;
+      let obj: THREE.Object3D | null = hit?.object ?? null;
+      while (obj) {
+        if (typeof obj.userData.key === "string") {
+          found = obj.userData.key;
+          break;
+        }
+        obj = obj.parent;
+      }
+      hoverRef.current = found;
+      const rec = found ? worldRef.current?.records.find((item) => item.key === found) : null;
+      if (!rec || useLab.getState().measuring) {
+        tip.style.opacity = "0";
+        return;
+      }
+      tip.textContent = rec.label;
+      tip.style.opacity = "1";
+      tip.style.transform = `translate(${event.clientX - rect.left + 14}px, ${event.clientY - rect.top + 16}px)`;
+    };
+    const onLeave = () => {
+      hoverRef.current = null;
+      tip.style.opacity = "0";
+    };
     el.addEventListener("pointerdown", onDown);
     el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerleave", onLeave);
     return () => {
       el.removeEventListener("pointerdown", onDown);
       el.removeEventListener("pointerup", onUp);
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerleave", onLeave);
+      tip.remove();
     };
   }, [camera, gl]);
 
@@ -2631,14 +2671,7 @@ function Specimen() {
     if (!frame) return;
     const d = Math.min(delta, 0.05);
     const state = useLab.getState();
-    if (!layersOpened) {
-      layersOpened = true;
-      if (!state.view) {
-        const visible = { ...state.visible };
-        for (const cat of CATEGORIES) visible[cat.id] = true;
-        useLab.getState().patch({ visible });
-      }
-    }
+    if (!layersOpened) layersOpened = true;
     const breathPeriod = 60 / Math.max(4, state.rr);
     const breathPhase = ((performance.now() / 1000) % breathPeriod) / breathPeriod;
     const insp =
@@ -2975,6 +3008,10 @@ function Specimen() {
         rec.mat.emissive.set("#000000");
         rec.mat.emissiveIntensity = 0;
       }
+      if (hoverRef.current === rec.key && state.selected !== rec.key && !(scenarioOn && warm)) {
+        rec.mat.emissive.set("#7a4a3a");
+        rec.mat.emissiveIntensity = Math.max(rec.mat.emissiveIntensity, 0.07);
+      }
     }
 
     const circuit = circuitRef.current;
@@ -3182,11 +3219,11 @@ export function Stage() {
           alpha: false,
           localClippingEnabled: true,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 0.72,
+          toneMappingExposure: 0.75,
           powerPreference: "high-performance",
         }}
         onCreated={({ gl, scene }) => {
-          gl.toneMappingExposure = 0.72;
+          gl.toneMappingExposure = 0.75;
           gl.outputColorSpace = THREE.SRGBColorSpace;
           gl.shadowMap.enabled = true;
           gl.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -3195,10 +3232,10 @@ export function Stage() {
           try {
             const pmrem = new THREE.PMREMGenerator(gl);
             scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.18).texture;
-            scene.environmentIntensity = 0.035;
+            scene.environmentIntensity = 0.02;
             pmrem.dispose();
           } catch {
-            scene.environmentIntensity = 0.04;
+            scene.environmentIntensity = 0.02;
           }
         }}
       >

@@ -243,7 +243,7 @@ export function buildCirculation(
     return from.clone().addScaledVector(inferior, s(dist)).addScaledVector(fr.right, s(lat)).addScaledVector(fr.anterior, s(ant));
   };
 
-  const hub = at(0.4, -12, 78);
+  const hub = at(0.47, -18, 58);
   const xAxis = right.clone().normalize();
   const yAxis = inferior.clone().negate().normalize();
   yAxis.addScaledVector(xAxis, -yAxis.dot(xAxis)).normalize();
@@ -254,7 +254,14 @@ export function buildCirculation(
   }
   const basis = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
   const orient = new THREE.Quaternion().setFromRotationMatrix(basis);
-  const toWorld = (p: THREE.Vector3) => p.clone().applyMatrix4(basis).add(hub);
+  const place = (p: THREE.Vector3) => p.clone().applyMatrix4(basis).add(hub);
+  const toWorld = (p: THREE.Vector3) => {
+    const q = p.clone();
+    q.x *= 1.05;
+    q.y *= 1.26;
+    q.z *= 1.03;
+    return q.applyMatrix4(basis).add(hub);
+  };
 
   const groove = 2.15;
   const ventricle = (u: number, v: number) => {
@@ -342,6 +349,7 @@ export function buildCirculation(
   tube(fatIv, seam, s(2.2), 0.4);
 
   const heart = (geo: THREE.BufferGeometry, key: string, label: string, side: CircPart["side"], blurb: string, beat: CircPart["beat"], drift: THREE.Vector3, weight: number, color?: string) => {
+    geo.scale(1.05, 1.26, 1.03);
     parts.push({ geo, key, label, cat: "heart", side, blurb, beat, center: hub, orient, drift, weight, color });
   };
   heart(lv, "heart:lv", "Left ventricle", "left", "Thick-walled chamber forming the apex and the left border. It shortens and twists on each systole. The wall is open at the base so the cavity shows when the heart is exploded.", "ventricle", D(-1, -0.8, -0.25), 1);
@@ -399,16 +407,16 @@ export function buildCirculation(
   const lpa: Buf = { p: [], ix: [] };
   const hilumL = new THREE.Vector3(s(-40), s(16), s(-8));
   const hilumR = new THREE.Vector3(s(46), s(2), s(-6));
-  tube(lpa, chain([split, toWorld(new THREE.Vector3(s(-18), s(36), s(2))), toWorld(hilumL)], 4), s(8), 0.12);
+  tube(lpa, chain([split, toWorld(new THREE.Vector3(s(-18), s(36), s(2))), place(hilumL)], 4), s(8), 0.12);
   const rpa: Buf = { p: [], ix: [] };
-  tube(rpa, chain([split, toWorld(new THREE.Vector3(s(22), s(30), s(2))), toWorld(hilumR)], 4), s(9), 0.1);
+  tube(rpa, chain([split, toWorld(new THREE.Vector3(s(22), s(30), s(2))), place(hilumR)], 4), s(9), 0.1);
 
   const veinsL: Buf = { p: [], ix: [] };
   const veinsR: Buf = { p: [], ix: [] };
-  tube(veinsL, chain([toWorld(hilumL.clone().add(new THREE.Vector3(0, s(6), s(-2)))), toWorld(new THREE.Vector3(s(-14), s(34), s(-28)))], 3), s(4.2), 0.05);
-  tube(veinsL, chain([toWorld(hilumL.clone().add(new THREE.Vector3(0, s(-6), s(-2)))), toWorld(new THREE.Vector3(s(-6), s(22), s(-28)))], 3), s(4.2), 0.05);
-  tube(veinsR, chain([toWorld(hilumR.clone().add(new THREE.Vector3(0, s(6), s(-2)))), toWorld(new THREE.Vector3(s(2), s(32), s(-26)))], 3), s(4.2), 0.05);
-  tube(veinsR, chain([toWorld(hilumR.clone().add(new THREE.Vector3(0, s(-6), s(-2)))), toWorld(new THREE.Vector3(s(4), s(18), s(-26)))], 3), s(4.2), 0.05);
+  tube(veinsL, chain([place(hilumL.clone().add(new THREE.Vector3(0, s(6), s(-2)))), toWorld(new THREE.Vector3(s(-14), s(34), s(-28)))], 3), s(4.2), 0.05);
+  tube(veinsL, chain([place(hilumL.clone().add(new THREE.Vector3(0, s(-6), s(-2)))), toWorld(new THREE.Vector3(s(-6), s(22), s(-28)))], 3), s(4.2), 0.05);
+  tube(veinsR, chain([place(hilumR.clone().add(new THREE.Vector3(0, s(6), s(-2)))), toWorld(new THREE.Vector3(s(2), s(32), s(-26)))], 3), s(4.2), 0.05);
+  tube(veinsR, chain([place(hilumR.clone().add(new THREE.Vector3(0, s(-6), s(-2)))), toWorld(new THREE.Vector3(s(4), s(18), s(-26)))], 3), s(4.2), 0.05);
 
   const pushTube = (buf: Buf, key: string, label: string, cat: CatId, side: CircPart["side"], blurb: string, drift: THREE.Vector3, weight: number, beat?: CircPart["beat"]) => {
     if (!buf.p.length) return;
@@ -573,22 +581,22 @@ export function buildCirculation(
     const posterior = Math.max(0, -anteriorDir);
     const grow = Math.pow(Math.max(u, 0.02), 0.55);
     const opened = 0.22 + 0.78 * grow;
-    let latHalf = (side > 0 ? 48 : 40) * opened;
-    let medHalf = (side > 0 ? 34 : 28) * opened;
+    let latHalf = (side > 0 ? 50 : 40) * opened;
+    let medHalf = (side > 0 ? 26 : 20) * opened;
     const notch = Math.exp(-((u - 0.5) ** 2) / 0.012) * medial * (0.4 + 0.6 * anterior);
-    medHalf *= 1 - (side < 0 ? 0.4 : 0.16) * notch;
+    medHalf *= 1 - (side < 0 ? 0.55 : 0.22) * notch;
     const hilumDent = Math.exp(-((u - (side > 0 ? 0.48 : 0.4)) ** 2) / 0.0028) * medial;
     medHalf *= 1 - 0.12 * hilumDent;
     const half = around >= 0 ? latHalf : medHalf;
-    const apexX = side > 0 ? 52 : -28;
-    const midX = side > 0 ? 78 : -72;
+    const apexX = side > 0 ? 64 : -38;
+    const midX = side > 0 ? 96 : -88;
     const centerX = THREE.MathUtils.lerp(apexX, midX, Math.min(1, grow * 1.12));
     const centerZ = THREE.MathUtils.lerp(2, -10, u);
-    const ap = (side > 0 ? 58 : 52) * opened;
+    const ap = (side > 0 ? 54 : 48) * opened;
     let x = centerX + side * around * half;
     let z = centerZ + anteriorDir * (anterior > 0 ? ap * (1 - 0.4 * anterior) : ap * (1 + 0.12 * posterior));
     const along = Math.pow(u, 0.95);
-    let y = THREE.MathUtils.lerp(side > 0 ? 84 : 90, side > 0 ? -96 : -106, along);
+    let y = THREE.MathUtils.lerp(side > 0 ? 118 : 128, side > 0 ? -124 : -136, along);
     if (u > 0.64) {
       const k = (u - 0.64) / 0.36;
       y += k * (36 * medial + 18 * anterior);
@@ -714,13 +722,13 @@ export function buildCirculation(
     20,
     14,
     (u, v) => {
-      const x = THREE.MathUtils.lerp(-118, 132, u);
-      const z = THREE.MathUtils.lerp(-58, 40, v);
+      const x = THREE.MathUtils.lerp(-132, 148, u);
+      const z = THREE.MathUtils.lerp(-62, 36, v);
       const rightDome = Math.exp(-((u - 0.72) ** 2) / 0.012 - ((v - 0.42) ** 2) / 0.04);
       const leftDome = Math.exp(-((u - 0.28) ** 2) / 0.012 - ((v - 0.4) ** 2) / 0.04);
       const tendon = Math.exp(-((u - 0.48) ** 2) / 0.008 - ((v - 0.5) ** 2) / 0.02);
-      const y = -108 + rightDome * 32 + leftDome * 20 + tendon * 36;
-      return new THREE.Vector3(s(x), s(Math.min(y, -68)), s(z));
+      const y = -138 + rightDome * 28 + leftDome * 18 + tendon * 30;
+      return new THREE.Vector3(s(x), s(Math.min(y, -100)), s(z));
     },
     s(3),
     () => new THREE.Vector3(0, 1, 0),
@@ -738,23 +746,28 @@ export function buildCirculation(
     weight: 0.85,
   });
 
-  const carina = toWorld(new THREE.Vector3(s(-4), s(46), s(-16)));
+  const carina = place(new THREE.Vector3(s(-4), s(46), s(-16)));
   const trachea: Buf = { p: [], ix: [] };
-  tube(trachea, chain([at(0.08, 0, 14), at(0.18, -1, 10), toWorld(new THREE.Vector3(s(-2), s(120), s(2))), carina], 6), s(9), 0.08);
+  tube(trachea, chain([at(0.08, 0, 14), at(0.18, -1, 10), place(new THREE.Vector3(s(-2), s(120), s(2))), carina], 6), s(9), 0.08);
   const rightTree: Buf = { p: [], ix: [] };
-  const rHilum = toWorld(hilumR);
-  tube(rightTree, chain([carina, toWorld(new THREE.Vector3(s(18), s(22), s(-10))), rHilum], 3), s(7), 0.05);
-  tube(rightTree, chain([rHilum, toWorld(lungPoint(1, 0.22, 0.22))], 3), s(3.2), 0.3);
-  tube(rightTree, chain([rHilum, toWorld(lungPoint(1, 0.46, 0.18))], 3), s(2.6), 0.3);
-  tube(rightTree, chain([rHilum, toWorld(lungPoint(1, 0.72, 0.7))], 3), s(3.2), 0.3);
+  const rHilum = place(hilumR);
+  tube(rightTree, chain([carina, place(new THREE.Vector3(s(18), s(22), s(-10))), rHilum], 3), s(7), 0.05);
+  tube(rightTree, chain([rHilum, place(lungPoint(1, 0.22, 0.22))], 3), s(3.2), 0.3);
+  tube(rightTree, chain([rHilum, place(lungPoint(1, 0.46, 0.18))], 3), s(2.6), 0.3);
+  tube(rightTree, chain([rHilum, place(lungPoint(1, 0.72, 0.7))], 3), s(3.2), 0.3);
   const leftTree: Buf = { p: [], ix: [] };
-  const lHilum = toWorld(hilumL);
-  tube(leftTree, chain([carina, toWorld(new THREE.Vector3(s(-22), s(32), s(-12))), lHilum], 4), s(6), 0.08);
-  tube(leftTree, chain([lHilum, toWorld(lungPoint(-1, 0.24, 0.25))], 3), s(3), 0.3);
-  tube(leftTree, chain([lHilum, toWorld(lungPoint(-1, 0.7, 0.7))], 3), s(3), 0.3);
+  const lHilum = place(hilumL);
+  tube(leftTree, chain([carina, place(new THREE.Vector3(s(-22), s(32), s(-12))), lHilum], 4), s(6), 0.08);
+  tube(leftTree, chain([lHilum, place(lungPoint(-1, 0.24, 0.25))], 3), s(3), 0.3);
+  tube(leftTree, chain([lHilum, place(lungPoint(-1, 0.7, 0.7))], 3), s(3), 0.3);
   pushTube(trachea, "heart:trachea", "Trachea", "airway", "median", "The airway in the neck and superior mediastinum. It ends at the carina.", D(0, 0.8, 0.35), 0.65);
   pushTube(rightTree, "heart:bronchi-right", "Right bronchi", "airway", "right", "A short steep main bronchus, then bronchi to the upper, middle, and lower lobes.", D(1, 0.15, 0.2), 0.8);
   pushTube(leftTree, "heart:bronchi-left", "Left bronchi", "airway", "left", "A longer main bronchus, then bronchi to the upper and lower lobes.", D(-1, 0.15, 0.15), 0.8);
+
+  for (const part of parts) {
+    if (part.center !== hub) continue;
+    if (part.cat === "pericardium" || part.beat === "node") part.geo.scale(1.05, 1.26, 1.03);
+  }
 
   return parts;
 }
