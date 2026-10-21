@@ -243,7 +243,10 @@ export function buildCirculation(
     return from.clone().addScaledVector(inferior, s(dist)).addScaledVector(fr.right, s(lat)).addScaledVector(fr.anterior, s(ant));
   };
 
-  const hub = at(0.47, -18, 58);
+  const hub = at(0.5, -20, 46);
+  const HX = 1;
+  const HY = 1.22;
+  const HZ = 1;
   const xAxis = right.clone().normalize();
   const yAxis = inferior.clone().negate().normalize();
   yAxis.addScaledVector(xAxis, -yAxis.dot(xAxis)).normalize();
@@ -257,9 +260,9 @@ export function buildCirculation(
   const place = (p: THREE.Vector3) => p.clone().applyMatrix4(basis).add(hub);
   const toWorld = (p: THREE.Vector3) => {
     const q = p.clone();
-    q.x *= 1.05;
-    q.y *= 1.26;
-    q.z *= 1.03;
+    q.x *= HX;
+    q.y *= HY;
+    q.z *= HZ;
     return q.applyMatrix4(basis).add(hub);
   };
 
@@ -279,7 +282,7 @@ export function buildCirculation(
     rz += s(14) * rv;
     const left = Math.pow(Math.max(0, -Math.cos(ang)), 1.15);
     rx += s(7) * left * belly;
-    let x = Math.cos(ang) * rx - s(7) * belly;
+    let x = Math.cos(ang) * rx - s(8) * belly - s(12) * (1 - u);
     let z = Math.sin(ang) * rz;
     const iv = Math.exp(-((ang - groove) ** 2) / 0.045) * belly * (u > 0.18 && u < 0.92 ? 1 : 0.15);
     const rad = Math.hypot(x, z) || 1;
@@ -349,7 +352,7 @@ export function buildCirculation(
   tube(fatIv, seam, s(2.2), 0.4);
 
   const heart = (geo: THREE.BufferGeometry, key: string, label: string, side: CircPart["side"], blurb: string, beat: CircPart["beat"], drift: THREE.Vector3, weight: number, color?: string) => {
-    geo.scale(1.05, 1.26, 1.03);
+    geo.scale(HX, HY, HZ);
     parts.push({ geo, key, label, cat: "heart", side, blurb, beat, center: hub, orient, drift, weight, color });
   };
   heart(lv, "heart:lv", "Left ventricle", "left", "Thick-walled chamber forming the apex and the left border. It shortens and twists on each systole. The wall is open at the base so the cavity shows when the heart is exploded.", "ventricle", D(-1, -0.8, -0.25), 1);
@@ -581,25 +584,26 @@ export function buildCirculation(
     const posterior = Math.max(0, -anteriorDir);
     const grow = Math.pow(Math.max(u, 0.02), 0.55);
     const opened = 0.22 + 0.78 * grow;
-    let latHalf = (side > 0 ? 50 : 40) * opened;
-    let medHalf = (side > 0 ? 26 : 20) * opened;
-    const notch = Math.exp(-((u - 0.5) ** 2) / 0.012) * medial * (0.4 + 0.6 * anterior);
-    medHalf *= 1 - (side < 0 ? 0.55 : 0.22) * notch;
+    let latHalf = (side > 0 ? 52 : 38) * opened;
+    let medHalf = (side > 0 ? 28 : 16) * opened;
+    const notch = Math.exp(-((u - 0.48) ** 2) / 0.02) * medial * (0.35 + 0.65 * anterior);
+    medHalf *= 1 - (side < 0 ? 0.62 : 0.2) * notch;
     const hilumDent = Math.exp(-((u - (side > 0 ? 0.48 : 0.4)) ** 2) / 0.0028) * medial;
     medHalf *= 1 - 0.12 * hilumDent;
     const half = around >= 0 ? latHalf : medHalf;
-    const apexX = side > 0 ? 64 : -38;
-    const midX = side > 0 ? 96 : -88;
+    const apexX = side > 0 ? 46 : -30;
+    const midX = side > 0 ? 90 : -78;
     const centerX = THREE.MathUtils.lerp(apexX, midX, Math.min(1, grow * 1.12));
-    const centerZ = THREE.MathUtils.lerp(2, -10, u);
-    const ap = (side > 0 ? 54 : 48) * opened;
+    const centerZ = THREE.MathUtils.lerp(0, -8, u);
+    const ap = (side > 0 ? 50 : 44) * opened;
+    const front = ap * (medial > 0.35 ? (side < 0 ? 0.52 : 0.7) : 1);
     let x = centerX + side * around * half;
-    let z = centerZ + anteriorDir * (anterior > 0 ? ap * (1 - 0.4 * anterior) : ap * (1 + 0.12 * posterior));
+    let z = centerZ + anteriorDir * (anterior > 0 ? front * (1 - 0.35 * anterior) : ap * (1 + 0.08 * posterior));
     const along = Math.pow(u, 0.95);
-    let y = THREE.MathUtils.lerp(side > 0 ? 118 : 128, side > 0 ? -124 : -136, along);
+    let y = THREE.MathUtils.lerp(side > 0 ? 62 : 74, side > 0 ? -90 : -108, along);
     if (u > 0.64) {
       const k = (u - 0.64) / 0.36;
-      y += k * (36 * medial + 18 * anterior);
+      y += k * (16 * medial + 14 * anterior);
     }
     x -= side * costal * Math.sin((y / 16) * Math.PI * 2) * 0.55 * grow;
     if (inflate !== 1) {
@@ -727,8 +731,8 @@ export function buildCirculation(
       const rightDome = Math.exp(-((u - 0.72) ** 2) / 0.012 - ((v - 0.42) ** 2) / 0.04);
       const leftDome = Math.exp(-((u - 0.28) ** 2) / 0.012 - ((v - 0.4) ** 2) / 0.04);
       const tendon = Math.exp(-((u - 0.48) ** 2) / 0.008 - ((v - 0.5) ** 2) / 0.02);
-      const y = -138 + rightDome * 28 + leftDome * 18 + tendon * 30;
-      return new THREE.Vector3(s(x), s(Math.min(y, -100)), s(z));
+      const y = -126 + rightDome * 42 + leftDome * 22 + tendon * 18;
+      return new THREE.Vector3(s(x), s(Math.min(y, -82)), s(z));
     },
     s(3),
     () => new THREE.Vector3(0, 1, 0),
@@ -766,7 +770,7 @@ export function buildCirculation(
 
   for (const part of parts) {
     if (part.center !== hub) continue;
-    if (part.cat === "pericardium" || part.beat === "node") part.geo.scale(1.05, 1.26, 1.03);
+    if (part.cat === "pericardium" || part.beat === "node") part.geo.scale(HX, HY, HZ);
   }
 
   return parts;

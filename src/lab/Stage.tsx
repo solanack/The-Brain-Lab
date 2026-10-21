@@ -2816,7 +2816,7 @@ function Specimen() {
         const sx = 1 + a * 0.08;
         const sy = 1 + a * 0.045;
         const sz = 1 + a * 0.06;
-        _pin.set(0, (70 / frame.unitToMm) * (1 - sy), 0).applyQuaternion(rec.mesh.quaternion);
+        _pin.set(0, (74 / frame.unitToMm) * (1 - sy), 0).applyQuaternion(rec.mesh.quaternion);
         _pos.add(_pin);
         rec.mesh.scale.set(sx, sy, sz);
       } else if (rec.cat === "diaphragm") {
