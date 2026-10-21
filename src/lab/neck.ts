@@ -434,9 +434,9 @@ export function buildHeadNeck(opts: {
     for (let i = 0; i < 12; i++) {
       const row = level(i);
       const mid = (row.back + row.front) * 0.5;
-      const rAnt = (row.front - row.back) * 0.5 + 16;
-      const rLat = row.half + 16;
-      const steps = i >= 10 ? 4 : 6;
+      const rAnt = (row.front - row.back) * 0.5 + 28;
+      const rLat = row.half + (sign > 0 ? 30 : 24);
+      const steps = i >= 10 ? 5 : 9;
       const start = Math.PI * 0.86;
       const end = i >= 10 ? Math.PI * 0.48 : i >= 7 ? Math.PI * 0.22 : Math.PI * 0.08;
       const pts: THREE.Vector3[] = [];

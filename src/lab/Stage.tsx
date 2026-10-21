@@ -1098,7 +1098,7 @@ function measureChest(
   const samples: { down: number; ant: number; lat: number; shell: boolean }[] = [];
   const p = new THREE.Vector3();
   for (const rec of records) {
-    const shell = rec.cat === "lungs" || rec.cat === "pleura" || rec.cat === "diaphragm";
+    const shell = rec.cat === "lungs" || rec.cat === "diaphragm";
     const heart = rec.cat === "heart" && !rec.key.startsWith("heart:fat");
     if (!shell && !heart) continue;
     const attr = rec.mesh.geometry.getAttribute("position");

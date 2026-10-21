@@ -702,21 +702,21 @@ export function buildCirculation(
   placeLung(solidLobe(-1, 0.02, 0.52), "heart:lul", "Left upper lobe", "left", "Includes the lingula. The cardiac notch is on its medial side.", D(-1, 0.85, 0.25), 1);
   placeLung(solidLobe(-1, 0.46, 0.98), "heart:lll", "Left lower lobe", "left", "Below the oblique fissure, against the diaphragm.", D(-0.85, -0.7, -0.2), 1);
   placeLung(
-    surface(16, 24, (u, v) => lungPoint(1, 0.02 + u * 0.96, v, 1.04)),
+    surface(16, 24, (u, v) => lungPoint(1, 0.02 + u * 0.96, v, 1.02)),
     "heart:pleura-right",
     "Right pleura",
     "right",
-    "The sac around the right lung. Explode lifts it off the three lobes.",
+    "The sac around the right lung, inset from the ribs so the cage does not cut it, including when the lung fills. Teaching approximation.",
     D(1.1, 0.1, -0.1),
     1.35,
     "pleura",
   );
   placeLung(
-    surface(16, 24, (u, v) => lungPoint(-1, 0.02 + u * 0.96, v, 1.04)),
+    surface(16, 24, (u, v) => lungPoint(-1, 0.02 + u * 0.96, v, 1.02)),
     "heart:pleura-left",
     "Left pleura",
     "left",
-    "The sac around the left lung. Explode lifts it off the two lobes.",
+    "The sac around the left lung, inset from the ribs. Teaching approximation.",
     D(-1.1, 0.1, -0.1),
     1.35,
     "pleura",
